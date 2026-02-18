@@ -152,6 +152,36 @@ if (import.meta.vitest) {
     await rm(tmpProject, { recursive: true });
   });
 
+  // Direct unit tests for the module-private filter function
+  describe("shouldInclude", () => {
+    it("includes a top-level file", () => {
+      // Given / When / Then
+      expect(shouldInclude("settings.json")).toBe(true);
+      expect(shouldInclude("CLAUDE.md")).toBe(true);
+    });
+
+    it('excludes the bare "skills" top-level entry', () => {
+      // Given / When / Then
+      expect(shouldInclude("skills")).toBe(false);
+    });
+
+    it("includes skills/<name> as a leaf directory", () => {
+      // Given / When / Then
+      expect(shouldInclude("skills/my-debug")).toBe(true);
+    });
+
+    it("excludes depth-2 paths that are not under skills/", () => {
+      // Given: a hypothetical path the walker would never emit, but the guard covers it
+      // When / Then
+      expect(shouldInclude("foo/bar")).toBe(false);
+    });
+
+    it("excludes skills/<name>/<file> (depth-3 path)", () => {
+      // Given / When / Then
+      expect(shouldInclude("skills/my-debug/SKILL.md")).toBe(false);
+    });
+  });
+
   describe("scanWithRoots", () => {
     it("returns empty files when both dirs are empty", async () => {
       // Given: both global and project .claude dirs exist but are empty
@@ -250,6 +280,18 @@ if (import.meta.vitest) {
         (f) => f.relativePath === "skills/my-debug"
       );
       expect(fileIdx).toBeLessThan(dirIdx);
+    });
+
+    it("multiple files of the same type are sorted alphabetically", async () => {
+      // Given: two plain files with alphabetically distinct names
+      await writeFile(join(tmpGlobal, "z-last.md"), "z");
+      await writeFile(join(tmpGlobal, "a-first.md"), "a");
+      // When
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then: a-first comes before z-last (localeCompare branch in sort)
+      const aIdx = files.findIndex((f) => f.relativePath === "a-first.md");
+      const zIdx = files.findIndex((f) => f.relativePath === "z-last.md");
+      expect(aIdx).toBeLessThan(zIdx);
     });
 
     it("returns empty when neither directory exists on disk", async () => {

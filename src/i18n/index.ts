@@ -119,6 +119,15 @@ if (import.meta.vitest) {
       expect(detectLocale()).toBe("ja");
     });
 
+    it("defaults to en when locale is an unknown language code", () => {
+      // Given: LANG is set to a language that is neither ja nor en
+      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
+      delete process.env.CLAUDE_CONFIG_LANG;
+      process.env.LANG = "fr_FR.UTF-8";
+      // When / Then: falls through the loop and returns "en"
+      expect(detectLocale()).toBe("en");
+    });
+
     it("falls back to LC_ALL when CLAUDE_CONFIG_LANG and LANG unset", () => {
       // Given
       // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
@@ -145,6 +154,25 @@ if (import.meta.vitest) {
   });
 
   describe("initI18n + t()", () => {
+    it("throws when t() is called before initI18n()", () => {
+      // Given: _messages is null at module load (detectLocale tests above never call initI18n)
+      // When / Then
+      expect(() => t("header_title")).toThrow("i18n not initialized");
+    });
+
+    it("picks up locale from env when called without an argument", async () => {
+      // Given: LANG is set to Japanese, no explicit locale passed
+      process.env.LANG = "ja_JP.UTF-8";
+      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
+      delete process.env.CLAUDE_CONFIG_LANG;
+      // When
+      await initI18n();
+      // Then: detectLocale() was used and resolved to ja
+      expect(currentLocale()).toBe("ja");
+      // Restore to en for subsequent tests
+      await initI18n("en");
+    });
+
     it("en: t() returns English strings after initI18n('en')", async () => {
       // Given
       await initI18n("en");
@@ -169,6 +197,22 @@ if (import.meta.vitest) {
       expect(Object.keys(ja.messages).sort()).toEqual(
         Object.keys(en.messages).sort()
       );
+    });
+
+    it("currentLocale() reflects the locale set by initI18n", async () => {
+      // Given
+      await initI18n("ja");
+      // When / Then
+      expect(currentLocale()).toBe("ja");
+    });
+
+    it("t() returns the key itself when it has no translation (defensive fallback)", async () => {
+      // Given: initialized with en, then asking for an unknown key via cast
+      await initI18n("en");
+      // When: cast bypasses TS type check to simulate a missing key at runtime
+      const result = t("__missing_key__" as keyof Messages);
+      // Then: returns the key string as fallback
+      expect(result).toBe("__missing_key__");
     });
   });
 }

@@ -14,9 +14,10 @@ export function diffText(rawA: string | null, rawB: string | null): DiffResult {
     return { identical: true, lines: [], summary: "Both files missing" };
   }
   if (rawA === null) {
+    // rawB is non-null here: the both-null case returned above
     return {
       identical: false,
-      lines: (rawB ?? "").split("\n").map((l) => `+ ${l}`),
+      lines: (rawB as string).split("\n").map((l) => `+ ${l}`),
       summary: "Only exists in destination",
     };
   }
@@ -248,6 +249,16 @@ if (import.meta.vitest) {
         result.lines.some((l) => l.startsWith("+") && l.includes('"key"'))
       ).toBe(true);
     });
+
+    it("signals fallback when passed null (caller must use text diff)", () => {
+      // Given: one side could not be parsed as JSON (represented as null)
+      // When
+      const result = diffJsonObjects(null, { key: 1 });
+      // Then: empty non-identical result tells caller to fall back to text diff
+      expect(result.identical).toBe(false);
+      expect(result.lines).toHaveLength(0);
+      expect(result.summary).toBe("");
+    });
   });
 
   // ── diffFiles / diffJsonFiles (I/O wrappers) ───────────────────────────────
@@ -361,6 +372,30 @@ if (import.meta.vitest) {
       );
       // Then
       expect(result.identical).toBe(true);
+    });
+
+    it("falls back to text diff when source file is missing", async () => {
+      // Given: A is missing, B is valid JSON
+      const b = join(tmpDir, "b.json");
+      await writeFile(b, '{"key": 1}');
+      // When
+      const result = await diffJsonFiles(join(tmpDir, "missing.json"), b);
+      // Then: diffText fallback → all lines start with +, summary is text-diff wording
+      expect(result.identical).toBe(false);
+      expect(result.summary).toBe("Only exists in destination");
+      expect(result.lines.every((l) => l.startsWith("+"))).toBe(true);
+    });
+
+    it("falls back to text diff when destination file is missing", async () => {
+      // Given: A is valid JSON, B is missing
+      const a = join(tmpDir, "a.json");
+      await writeFile(a, '{"key": 1}');
+      // When
+      const result = await diffJsonFiles(a, join(tmpDir, "missing.json"));
+      // Then: diffText fallback → all lines start with -, summary is text-diff wording
+      expect(result.identical).toBe(false);
+      expect(result.summary).toBe("Only exists in source");
+      expect(result.lines.every((l) => l.startsWith("-"))).toBe(true);
     });
   });
 }
