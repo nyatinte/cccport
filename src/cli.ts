@@ -1,26 +1,27 @@
 #!/usr/bin/env node
-// src/cli.ts
-import { initI18n, detectLocale } from './i18n/index.js'
-import { scanClaudeDirs } from './utils/scanner.js'
-import { runInteractive } from './ui/interactive.js'
+import { initI18n } from "./i18n/index.js";
+import { runInteractive } from "./ui/interactive.js";
+import { scanClaudeDirs } from "./utils/scanner.js";
 
-// ── 引数パース ─────────────────────────────────────────────
-const args = process.argv.slice(2)
+const args = process.argv.slice(2);
 
 function getFlag(flags: string[]): string | undefined {
   for (const flag of flags) {
-    const idx = args.indexOf(flag)
-    if (idx !== -1 && idx + 1 < args.length) return args[idx + 1]
+    const idx = args.indexOf(flag);
+    if (idx !== -1 && idx + 1 < args.length) {
+      return args[idx + 1];
+    }
   }
-  return undefined
+  return undefined;
 }
 
 function hasFlag(flags: string[]): boolean {
-  return flags.some(f => args.includes(f))
+  return flags.some((f) => args.includes(f));
 }
 
-if (hasFlag(['-h', '--help'])) {
-  console.log(`
+if (hasFlag(["-h", "--help"])) {
+  console.log(
+    `
 Usage: cccport [options]
 
 Options:
@@ -28,22 +29,22 @@ Options:
   -l, --lang <locale>    Language: en | ja (default: auto-detect)
   -h, --help             Show this help
   -v, --version          Show version
-`.trim())
-  process.exit(0)
+`.trim()
+  );
+  process.exit(0);
 }
 
-if (hasFlag(['-v', '--version'])) {
-  const { createRequire } = await import('node:module')
-  const require = createRequire(import.meta.url)
-  const pkg = require('../package.json') as { version: string }
-  console.log(pkg.version)
-  process.exit(0)
+if (hasFlag(["-v", "--version"])) {
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const pkg = require("../package.json") as { version: string };
+  console.log(pkg.version);
+  process.exit(0);
 }
 
-const projectCwd = getFlag(['-p', '--project']) ?? process.cwd()
-const langArg    = getFlag(['-l', '--lang']) as 'en' | 'ja' | undefined
+const projectCwd = getFlag(["-p", "--project"]) ?? process.cwd();
+const langArg = getFlag(["-l", "--lang"]) as "en" | "ja" | undefined;
 
-// ── 起動 ──────────────────────────────────────────────────
-await initI18n(langArg)
-const scan = await scanClaudeDirs(projectCwd)
-await runInteractive(scan)
+await initI18n(langArg);
+const scan = await scanClaudeDirs(projectCwd);
+await runInteractive(scan);

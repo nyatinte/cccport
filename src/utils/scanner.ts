@@ -1,237 +1,247 @@
-// src/utils/scanner.ts
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
-import * as os from 'node:os'
-import type { ClaudeFile, ScanResult } from '../types.js'
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, relative } from "node:path";
+import type { ClaudeFile, ScanResult } from "../types.js";
 
-const CLAUDE_DIR = '.claude'
+const CLAUDE_DIR = ".claude";
+const TRAILING_SLASH = /\/$/;
 
 /**
- * Decide whether a relative path (without trailing slash) should appear in the UI.
+ * Whether a relative path should appear in the UI.
  *
- * Rules:
- *  - Top-level files (no slash): always show
- *  - Top-level directories that are NOT "skills": always show
- *  - "skills" directory itself: EXCLUDE (don't show)
- *  - "skills/<name>": show (isDirectory=true)
- *  - "skills/<name>/anything": EXCLUDE (deep file inside skills dir)
- *  - Any other deep path (depth >= 3): EXCLUDE
+ * - Top-level files/dirs: show, except bare "skills" itself
+ * - skills/<name>: show as isDirectory=true
+ * - skills/<name>/...: exclude (too deep)
  */
-function shouldInclude(relativePath: string): boolean {
-  const parts = relativePath.split('/')
-
+function shouldInclude(rel: string): boolean {
+  const parts = rel.split("/");
   if (parts.length === 1) {
-    // Top-level entry — show everything except the bare "skills" directory
-    // (skills itself would be shown as a dir, but we want to show its children instead)
-    return parts[0] !== 'skills'
+    return parts[0] !== "skills";
   }
-
-  if (parts.length === 2 && parts[0] === 'skills') {
-    // skills/<name> — show as a directory entry
-    return true
+  if (parts.length === 2 && parts[0] === "skills") {
+    return true;
   }
-
-  // Everything else (depth >= 3, or non-skills depth-2) is excluded
-  return false
+  return false;
 }
 
-/**
- * Walk a .claude directory and return all relevant entries.
- */
-async function walkClaudeDir(root: string): Promise<string[]> {
-  if (!(await fs.pathExists(root))) return []
+function pathExists(p: string): Promise<boolean> {
+  return stat(p)
+    .then(() => true)
+    .catch(() => false);
+}
 
-  const results: string[] = []
+async function walkClaudeDir(root: string): Promise<string[]> {
+  if (!(await pathExists(root))) {
+    return [];
+  }
+
+  const results: string[] = [];
 
   async function walk(dir: string): Promise<void> {
-    const entries = await fs.readdir(dir, { withFileTypes: true })
+    const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      const abs = path.join(dir, entry.name)
-      const rel = path.relative(root, abs)
-
+      const abs = join(dir, entry.name);
+      const rel = relative(root, abs);
       if (entry.isDirectory()) {
-        results.push(rel + '/')
-        // Only recurse into "skills" (one level deep)
-        if (rel === 'skills') {
-          await walk(abs)
+        results.push(`${rel}/`);
+        // Only recurse one level into skills/ — individual skill dirs are the leaf nodes
+        if (rel === "skills") {
+          await walk(abs);
         }
       } else {
-        results.push(rel)
+        results.push(rel);
       }
     }
   }
 
-  await walk(root)
-  return results
+  await walk(root);
+  return results;
 }
 
-/**
- * Merge two sets of relative paths into ClaudeFile entries.
- */
-function mergeEntries(
+function buildFileList(
   globalRoot: string,
   projectRoot: string,
   globalEntries: string[],
-  projectEntries: string[],
+  projectEntries: string[]
 ): ClaudeFile[] {
-  const allKeys = new Set<string>([
-    ...globalEntries.map(e => e.replace(/\/$/, '')),
-    ...projectEntries.map(e => e.replace(/\/$/, '')),
-  ])
+  const globalDirs = new Set(
+    globalEntries.filter((e) => e.endsWith("/")).map((e) => e.slice(0, -1))
+  );
+  const projectDirs = new Set(
+    projectEntries.filter((e) => e.endsWith("/")).map((e) => e.slice(0, -1))
+  );
 
-  const globalDirs = new Set(globalEntries.filter(e => e.endsWith('/')).map(e => e.slice(0, -1)))
-  const projectDirs = new Set(projectEntries.filter(e => e.endsWith('/')).map(e => e.slice(0, -1)))
+  const allKeys = new Set([
+    ...globalEntries.map((e) => e.replace(TRAILING_SLASH, "")),
+    ...projectEntries.map((e) => e.replace(TRAILING_SLASH, "")),
+  ]);
 
-  const files: ClaudeFile[] = []
-
+  const files: ClaudeFile[] = [];
   for (const rel of allKeys) {
-    if (!shouldInclude(rel)) continue
-
-    const isDirectory = globalDirs.has(rel) || projectDirs.has(rel)
+    if (!shouldInclude(rel)) {
+      continue;
+    }
+    const isDirectory = globalDirs.has(rel) || projectDirs.has(rel);
     files.push({
       relativePath: rel,
       isDirectory,
-      existsGlobal: globalEntries.includes(isDirectory ? rel + '/' : rel),
-      existsProject: projectEntries.includes(isDirectory ? rel + '/' : rel),
-      globalPath: path.join(globalRoot, rel),
-      projectPath: path.join(projectRoot, rel),
-    })
+      existsGlobal: globalEntries.includes(isDirectory ? `${rel}/` : rel),
+      existsProject: projectEntries.includes(isDirectory ? `${rel}/` : rel),
+      globalPath: join(globalRoot, rel),
+      projectPath: join(projectRoot, rel),
+    });
   }
 
-  // Sort: files first, then directories; alphabetical within each group
-  files.sort((a, b) => {
-    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? 1 : -1
-    return a.relativePath.localeCompare(b.relativePath)
-  })
-
-  return files
+  return files.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) {
+      return a.isDirectory ? 1 : -1;
+    }
+    return a.relativePath.localeCompare(b.relativePath);
+  });
 }
 
-/**
- * Internal helper used by tests to inject custom roots.
- */
-export async function scanWithRoots(globalRoot: string, projectRoot: string): Promise<ScanResult> {
+/** Test helper: inject roots instead of relying on homedir. */
+export async function scanWithRoots(
+  globalRoot: string,
+  projectRoot: string
+): Promise<ScanResult> {
   const [globalEntries, projectEntries] = await Promise.all([
     walkClaudeDir(globalRoot),
     walkClaudeDir(projectRoot),
-  ])
-
-  const files = mergeEntries(globalRoot, projectRoot, globalEntries, projectEntries)
-
-  return { globalRoot, projectRoot, files }
+  ]);
+  return {
+    globalRoot,
+    projectRoot,
+    files: buildFileList(
+      globalRoot,
+      projectRoot,
+      globalEntries,
+      projectEntries
+    ),
+  };
 }
 
 /**
- * Scan the global ~/.claude and the project .claude directory.
- *
- * @param projectCwd  Working directory of the project (must contain a .claude subdir)
- * @param globalRoot  Override the global root (default: os.homedir()/.claude). Used in tests.
+ * Scan ~/.claude (global) and <projectCwd>/.claude (project).
+ * Pass globalRoot to override ~/.claude in tests.
  */
-export async function scanClaudeDirs(
+export function scanClaudeDirs(
   projectCwd: string,
-  globalRoot?: string,
+  globalRoot?: string
 ): Promise<ScanResult> {
-  const resolvedGlobal = globalRoot ?? path.join(os.homedir(), CLAUDE_DIR)
-  const resolvedProject = path.join(projectCwd, CLAUDE_DIR)
-  return scanWithRoots(resolvedGlobal, resolvedProject)
+  return scanWithRoots(
+    globalRoot ?? join(homedir(), CLAUDE_DIR),
+    join(projectCwd, CLAUDE_DIR)
+  );
 }
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, beforeEach, afterEach } = import.meta.vitest
+  const { describe, it, expect, beforeEach, afterEach } = import.meta.vitest;
 
-  let tmpGlobal: string
-  let tmpProject: string
+  let tmpGlobal: string;
+  let tmpProject: string;
 
   beforeEach(async () => {
-    tmpGlobal = await fs.mkdtemp('/tmp/cccport-global-')
-    tmpProject = await fs.mkdtemp('/tmp/cccport-project-')
-  })
+    tmpGlobal = await mkdtemp("/tmp/cccport-global-");
+    tmpProject = await mkdtemp("/tmp/cccport-project-");
+  });
 
   afterEach(async () => {
-    await fs.remove(tmpGlobal)
-    await fs.remove(tmpProject)
-  })
+    await rm(tmpGlobal, { recursive: true });
+    await rm(tmpProject, { recursive: true });
+  });
 
-  describe('scanWithRoots', () => {
-    it('returns empty files when both dirs are empty', async () => {
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      expect(files).toHaveLength(0)
-    })
+  describe("scanWithRoots", () => {
+    it("returns empty files when both dirs are empty", async () => {
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(files).toHaveLength(0);
+    });
 
-    it('detects a file that exists only in global', async () => {
-      await fs.writeFile(path.join(tmpGlobal, 'settings.json'), '{}')
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      expect(files).toHaveLength(1)
-      expect(files[0]?.relativePath).toBe('settings.json')
-      expect(files[0]?.existsGlobal).toBe(true)
-      expect(files[0]?.existsProject).toBe(false)
-    })
+    it("detects a file that exists only in global", async () => {
+      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(files).toHaveLength(1);
+      expect(files[0]?.relativePath).toBe("settings.json");
+      expect(files[0]?.existsGlobal).toBe(true);
+      expect(files[0]?.existsProject).toBe(false);
+    });
 
-    it('detects a file that exists only in project', async () => {
-      await fs.writeFile(path.join(tmpProject, 'CLAUDE.md'), '# hello')
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      expect(files).toHaveLength(1)
-      expect(files[0]?.relativePath).toBe('CLAUDE.md')
-      expect(files[0]?.existsGlobal).toBe(false)
-      expect(files[0]?.existsProject).toBe(true)
-    })
+    it("detects a file that exists only in project", async () => {
+      await writeFile(join(tmpProject, "CLAUDE.md"), "# hello");
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(files).toHaveLength(1);
+      expect(files[0]?.relativePath).toBe("CLAUDE.md");
+      expect(files[0]?.existsGlobal).toBe(false);
+      expect(files[0]?.existsProject).toBe(true);
+    });
 
-    it('detects a file that exists in both', async () => {
-      await fs.writeFile(path.join(tmpGlobal, 'settings.json'), '{}')
-      await fs.writeFile(path.join(tmpProject, 'settings.json'), '{}')
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      expect(files).toHaveLength(1)
-      expect(files[0]?.existsGlobal).toBe(true)
-      expect(files[0]?.existsProject).toBe(true)
-    })
+    it("detects a file that exists in both", async () => {
+      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      await writeFile(join(tmpProject, "settings.json"), "{}");
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(files).toHaveLength(1);
+      expect(files[0]?.existsGlobal).toBe(true);
+      expect(files[0]?.existsProject).toBe(true);
+    });
 
-    it('shows skills/<name> as a directory entry', async () => {
-      await fs.ensureDir(path.join(tmpGlobal, 'skills', 'my-debug'))
-      await fs.writeFile(path.join(tmpGlobal, 'skills', 'my-debug', 'SKILL.md'), '# skill')
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      const skillEntry = files.find(f => f.relativePath === 'skills/my-debug')
-      expect(skillEntry).toBeDefined()
-      expect(skillEntry?.isDirectory).toBe(true)
-    })
+    it("shows skills/<name> as a directory entry", async () => {
+      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
+      await writeFile(
+        join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
+        "# skill"
+      );
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const skill = files.find((f) => f.relativePath === "skills/my-debug");
+      expect(skill).toBeDefined();
+      expect(skill?.isDirectory).toBe(true);
+    });
 
-    it('BUG CHECK: "skills" parent dir itself should NOT appear as a file entry', async () => {
-      await fs.ensureDir(path.join(tmpGlobal, 'skills'))
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      // skills/ itself must NOT appear
-      const skillsDir = files.find(f => f.relativePath === 'skills')
-      expect(skillsDir).toBeUndefined()
-    })
+    it('"skills" parent dir itself should NOT appear', async () => {
+      await mkdir(join(tmpGlobal, "skills"), { recursive: true });
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(files.find((f) => f.relativePath === "skills")).toBeUndefined();
+    });
 
-    it('individual files inside skills/<name>/ are excluded', async () => {
-      await fs.ensureDir(path.join(tmpGlobal, 'skills', 'my-debug'))
-      await fs.writeFile(path.join(tmpGlobal, 'skills', 'my-debug', 'SKILL.md'), '# skill')
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      const deepFile = files.find(f => f.relativePath === 'skills/my-debug/SKILL.md')
-      expect(deepFile).toBeUndefined()
-    })
+    it("individual files inside skills/<name>/ are excluded", async () => {
+      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
+      await writeFile(
+        join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
+        "# skill"
+      );
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      expect(
+        files.find((f) => f.relativePath === "skills/my-debug/SKILL.md")
+      ).toBeUndefined();
+    });
 
-    it('files come before directories in sorted output', async () => {
-      await fs.writeFile(path.join(tmpGlobal, 'settings.json'), '{}')
-      await fs.ensureDir(path.join(tmpGlobal, 'skills', 'my-debug'))
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject)
-      const fileIdx = files.findIndex(f => f.relativePath === 'settings.json')
-      const dirIdx = files.findIndex(f => f.relativePath === 'skills/my-debug')
-      expect(fileIdx).toBeLessThan(dirIdx)
-    })
-  })
+    it("files come before directories in sorted output", async () => {
+      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
+      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const fileIdx = files.findIndex(
+        (f) => f.relativePath === "settings.json"
+      );
+      const dirIdx = files.findIndex(
+        (f) => f.relativePath === "skills/my-debug"
+      );
+      expect(fileIdx).toBeLessThan(dirIdx);
+    });
+  });
 
-  describe('scanClaudeDirs', () => {
-    it('scanClaudeDirs accepts custom globalRoot for testing', async () => {
-      await fs.writeFile(path.join(tmpGlobal, 'settings.json'), '{}')
-      const result = await scanClaudeDirs(tmpProject, tmpGlobal)
-      expect(result.globalRoot).toBe(tmpGlobal)
-      expect(result.files.some(f => f.relativePath === 'settings.json')).toBe(true)
-    })
+  describe("scanClaudeDirs", () => {
+    it("accepts custom globalRoot for testing", async () => {
+      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      const result = await scanClaudeDirs(tmpProject, tmpGlobal);
+      expect(result.globalRoot).toBe(tmpGlobal);
+      expect(result.files.some((f) => f.relativePath === "settings.json")).toBe(
+        true
+      );
+    });
 
-    it('uses os.homedir()/.claude when globalRoot is omitted', async () => {
-      const result = await scanClaudeDirs(tmpProject)
-      expect(result.globalRoot).toContain('.claude')
-    })
-  })
+    it("uses os.homedir()/.claude when globalRoot is omitted", async () => {
+      const result = await scanClaudeDirs(tmpProject);
+      expect(result.globalRoot).toContain(".claude");
+    });
+  });
 }
