@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { initI18n } from "./i18n/index.js";
 import { runInteractive } from "./ui/interactive.js";
-import { scanClaudeDirs } from "./utils/scanner.js";
+import { scanClaudeDirs } from "./utils/scanner/index.js";
 
 const args = process.argv.slice(2);
 
-function getFlag(flags: string[]): string | undefined {
+const getFlag = (flags: string[]): string | undefined => {
   for (const flag of flags) {
     const idx = args.indexOf(flag);
     if (idx !== -1 && idx + 1 < args.length) {
@@ -13,11 +13,10 @@ function getFlag(flags: string[]): string | undefined {
     }
   }
   return undefined;
-}
+};
 
-function hasFlag(flags: string[]): boolean {
-  return flags.some((f) => args.includes(f));
-}
+const hasFlag = (flags: string[]): boolean =>
+  flags.some((f) => args.includes(f));
 
 if (hasFlag(["-h", "--help"])) {
   console.log(

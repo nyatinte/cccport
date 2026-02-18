@@ -1,4 +1,4 @@
-export interface ClaudeFile {
+export type ClaudeFile = {
   /** Whether the file/dir exists in the global root */
   existsGlobal: boolean;
   /** Whether the file/dir exists in the project root */
@@ -11,10 +11,10 @@ export interface ClaudeFile {
   projectPath: string;
   /** Path relative to the .claude root (e.g. "settings.json", "skills/my-debug") */
   relativePath: string;
-}
+};
 
-export interface ScanResult {
+export type ScanResult = {
   files: ClaudeFile[];
   globalRoot: string;
   projectRoot: string;
-}
+};

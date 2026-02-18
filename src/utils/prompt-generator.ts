@@ -2,15 +2,15 @@ import { readFile } from "node:fs/promises";
 import { t } from "../i18n/index.js";
 import type { ClaudeFile } from "../types.js";
 
-export interface PromptDirection {
+export type PromptDirection = {
   from: "global" | "project";
   to: "global" | "project";
-}
+};
 
-export async function generateMigrationPrompt(
+export const generateMigrationPrompt = async (
   file: ClaudeFile,
   direction: PromptDirection
-): Promise<string> {
+): Promise<string> => {
   const fromLabel =
     direction.from === "global"
       ? `${t("header_global")} (~/.claude)`
@@ -26,20 +26,20 @@ export async function generateMigrationPrompt(
 
   if (file.isDirectory) {
     return [
-      `# Claude Config Migration: \`${file.relativePath}/\` (ディレクトリ)`,
+      `# Claude Config Migration: \`${file.relativePath}/\` ${t("prompt_dir_suffix")}`,
       "",
-      `移行元 (${fromLabel}): \`${fromPath}\``,
-      `移行先 (${toLabel}): \`${toPath}\``,
+      `${t("prompt_from")} (${fromLabel}): \`${fromPath}\``,
+      `${t("prompt_to")} (${toLabel}): \`${toPath}\``,
       "",
-      "## 指示",
+      t("prompt_instructions_heading"),
       "",
-      "このエントリはディレクトリです。",
-      "ディレクトリ内の各ファイルを確認し、必要に応じてマージまたはコピーしてください。",
+      t("prompt_dir_is_dir"),
+      t("prompt_dir_check_files"),
       "",
-      "特に `skills/` ディレクトリの場合:",
-      "- 各スキルの `SKILL.md` を確認してください",
-      "- 重複するスキルがある場合は内容をマージしてください",
-      "- 移行先にないスキルはそのままコピーしてください",
+      t("prompt_dir_skills_note"),
+      t("prompt_dir_check_skill_md"),
+      t("prompt_dir_merge_dups"),
+      t("prompt_dir_copy_new"),
     ].join("\n");
   }
 
@@ -49,22 +49,22 @@ export async function generateMigrationPrompt(
   const header = [
     `# Claude Config Migration: \`${file.relativePath}\``,
     "",
-    `移行元 (${fromLabel}): \`${fromPath}\``,
-    `移行先 (${toLabel}): \`${toPath}\``,
+    `${t("prompt_from")} (${fromLabel}): \`${fromPath}\``,
+    `${t("prompt_to")} (${toLabel}): \`${toPath}\``,
     "",
   ];
 
   if (fromContent === null) {
-    return [...header, "移行元ファイルが存在しません。"].join("\n");
+    return [...header, t("prompt_source_missing")].join("\n");
   }
 
   if (toContent === null) {
     return [
       ...header,
-      "## 指示",
+      t("prompt_instructions_heading"),
       "",
-      "移行先にファイルが存在しないため、移行元の内容をそのままコピーしてください。",
-      `\`${toPath}\` に以下の内容で新規作成してください:`,
+      t("prompt_dest_missing_body"),
+      `\`${toPath}\` ${t("prompt_dest_create_at")}`,
       "",
       "```",
       fromContent,
@@ -74,29 +74,29 @@ export async function generateMigrationPrompt(
 
   return [
     ...header,
-    "## 移行元の現在の内容",
+    t("prompt_source_heading"),
     "",
     "```",
     fromContent,
     "```",
     "",
-    "## 移行先の現在の内容",
+    t("prompt_dest_heading"),
     "",
     "```",
     toContent,
     "```",
     "",
-    "## 指示",
+    t("prompt_instructions_heading"),
     "",
-    "上記2つのファイルの内容をマージして、移行先ファイルを更新してください。",
-    "以下の点に注意してください:",
+    t("prompt_merge_body"),
+    t("prompt_merge_notes"),
     "",
-    "1. 移行元の設定を移行先に適用する",
-    "2. 移行先にしか存在しない設定は保持する",
-    "3. 競合する設定は移行元を優先する（確認が必要な場合はコメントを付ける）",
-    "4. JSONの場合はフォーマットを整える",
+    t("prompt_merge_note1"),
+    t("prompt_merge_note2"),
+    t("prompt_merge_note3"),
+    t("prompt_merge_note4"),
   ].join("\n");
-}
+};
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
@@ -111,7 +111,6 @@ if (import.meta.vitest) {
 
   describe("generateMigrationPrompt", () => {
     it("destination-missing: includes source content for copy", async () => {
-      // Given: source file exists, destination does not
       await using g = await createFixture({
         "settings.json": '{"model": "claude-3-5-sonnet"}',
       });
@@ -124,18 +123,15 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
-      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
-      // Then: prompt includes filename and source content
       expect(prompt).toContain("settings.json");
       expect(prompt).toContain("claude-3-5-sonnet");
     });
 
     it("source-missing: reports missing source without crashing", async () => {
-      // Given: source file does not exist on disk
       await using g = await createFixture({});
       await using p = await createFixture({});
       const file: ClaudeFile = {
@@ -146,17 +142,14 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
-      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
-      // Then: prompt indicates source is missing
-      expect(prompt).toContain("移行元ファイルが存在しません");
+      expect(prompt).toContain("Source file does not exist");
     });
 
     it("both-exist: includes both contents for merge", async () => {
-      // Given: both source and destination files exist with different content
       await using g = await createFixture({
         "settings.json": '{"model": "claude-opus"}',
       });
@@ -171,19 +164,16 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
-      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
-      // Then: prompt includes both contents and merge instructions
       expect(prompt).toContain("claude-opus");
       expect(prompt).toContain("dark");
-      expect(prompt).toContain("マージ");
+      expect(prompt).toContain("Merge");
     });
 
     it("directory: generates directory-specific instructions", async () => {
-      // Given: a skill directory entry (no file content to read)
       await using g = await createFixture({});
       await using p = await createFixture({});
       const file: ClaudeFile = {
@@ -194,18 +184,15 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "skills/my-debug"),
         projectPath: join(p.path, "skills/my-debug"),
       };
-      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "project",
         to: "global",
       });
-      // Then: prompt mentions directory and skills-specific guidance
       expect(prompt).toContain("skills/my-debug");
-      expect(prompt).toContain("ディレクトリ");
+      expect(prompt).toContain("directory");
     });
 
     it("i18n: uses Japanese labels when locale is ja", async () => {
-      // Given: locale set to Japanese, source file exists
       await initI18n("ja");
       await using g = await createFixture({ "settings.json": "{}" });
       await using p = await createFixture({});
@@ -217,12 +204,10 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
-      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
-      // Then: header contains Japanese locale label
       expect(prompt).toContain("グローバル");
     });
   });

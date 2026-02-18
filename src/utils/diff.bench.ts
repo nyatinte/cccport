@@ -1,5 +1,5 @@
 import { bench, describe } from "vitest";
-import { diffJsonObjects, diffText } from "./diff.js";
+import { diffJsonObjects, diffText } from "./diff/index.js";
 
 const SMALL_A = "hello\nworld\nfoo\nbar\nbaz";
 const SMALL_B = "hello\nearth\nfoo\nqux\nbaz";

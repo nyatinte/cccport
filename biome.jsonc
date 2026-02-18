@@ -1,4 +1,16 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": ["ultracite/biome/core"]
+  "extends": ["ultracite/biome/core"],
+  "linter": {
+    "rules": {
+      "style": {
+        // Allow both `type` and `interface` — project uses `type` for object shapes
+        "useConsistentTypeDefinitions": "off"
+      },
+      "performance": {
+        // Allow index.ts re-export files within split module directories
+        "noBarrelFile": "off"
+      }
+    }
+  }
 }
