@@ -120,10 +120,10 @@ if (import.meta.vitest) {
   });
 
   describe("generateMigrationPrompt", () => {
-    it("generates a prompt for a file that exists in source", async () => {
+    it("destination-missing: includes source content for copy", async () => {
+      // Given: source file exists, destination does not
       const globalPath = join(tmpGlobal, "settings.json");
       await writeFile(globalPath, '{"model": "claude-3-5-sonnet"}');
-
       const file: ClaudeFile = {
         relativePath: "settings.json",
         isDirectory: false,
@@ -132,16 +132,62 @@ if (import.meta.vitest) {
         globalPath,
         projectPath: join(tmpProject, "settings.json"),
       };
-
+      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // Then: prompt includes filename and source content
       expect(prompt).toContain("settings.json");
       expect(prompt).toContain("claude-3-5-sonnet");
     });
 
-    it("generates a prompt for directory entries", async () => {
+    it("source-missing: reports missing source without crashing", async () => {
+      // Given: source file does not exist on disk
+      const file: ClaudeFile = {
+        relativePath: "settings.json",
+        isDirectory: false,
+        existsGlobal: false,
+        existsProject: true,
+        globalPath: join(tmpGlobal, "settings.json"),
+        projectPath: join(tmpProject, "settings.json"),
+      };
+      // When
+      const prompt = await generateMigrationPrompt(file, {
+        from: "global",
+        to: "project",
+      });
+      // Then: prompt indicates source is missing
+      expect(prompt).toContain("移行元ファイルが存在しません");
+    });
+
+    it("both-exist: includes both contents for merge", async () => {
+      // Given: both source and destination files exist with different content
+      const globalPath = join(tmpGlobal, "settings.json");
+      const projectPath = join(tmpProject, "settings.json");
+      await writeFile(globalPath, '{"model": "claude-opus"}');
+      await writeFile(projectPath, '{"theme": "dark"}');
+      const file: ClaudeFile = {
+        relativePath: "settings.json",
+        isDirectory: false,
+        existsGlobal: true,
+        existsProject: true,
+        globalPath,
+        projectPath,
+      };
+      // When
+      const prompt = await generateMigrationPrompt(file, {
+        from: "global",
+        to: "project",
+      });
+      // Then: prompt includes both contents and merge instructions
+      expect(prompt).toContain("claude-opus");
+      expect(prompt).toContain("dark");
+      expect(prompt).toContain("マージ");
+    });
+
+    it("directory: generates directory-specific instructions", async () => {
+      // Given: a skill directory entry (no file content to read)
       const file: ClaudeFile = {
         relativePath: "skills/my-debug",
         isDirectory: true,
@@ -150,31 +196,35 @@ if (import.meta.vitest) {
         globalPath: join(tmpGlobal, "skills/my-debug"),
         projectPath: join(tmpProject, "skills/my-debug"),
       };
-
+      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "project",
         to: "global",
       });
+      // Then: prompt mentions directory and skills-specific guidance
       expect(prompt).toContain("skills/my-debug");
       expect(prompt).toContain("ディレクトリ");
     });
 
-    it("uses i18n labels in header", async () => {
+    it("i18n: uses Japanese labels when locale is ja", async () => {
+      // Given: locale set to Japanese, source file exists
       await initI18n("ja");
+      const globalPath = join(tmpGlobal, "settings.json");
+      await writeFile(globalPath, "{}");
       const file: ClaudeFile = {
         relativePath: "settings.json",
         isDirectory: false,
         existsGlobal: true,
         existsProject: false,
-        globalPath: join(tmpGlobal, "settings.json"),
+        globalPath,
         projectPath: join(tmpProject, "settings.json"),
       };
-      await writeFile(file.globalPath, "{}");
-
+      // When
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // Then: header contains Japanese locale label
       expect(prompt).toContain("グローバル");
     });
   });

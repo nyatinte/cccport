@@ -154,13 +154,19 @@ if (import.meta.vitest) {
 
   describe("scanWithRoots", () => {
     it("returns empty files when both dirs are empty", async () => {
+      // Given: both global and project .claude dirs exist but are empty
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then
       expect(files).toHaveLength(0);
     });
 
     it("detects a file that exists only in global", async () => {
+      // Given: settings.json only in global
       await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.relativePath).toBe("settings.json");
       expect(files[0]?.existsGlobal).toBe(true);
@@ -168,8 +174,11 @@ if (import.meta.vitest) {
     });
 
     it("detects a file that exists only in project", async () => {
+      // Given: CLAUDE.md only in project
       await writeFile(join(tmpProject, "CLAUDE.md"), "# hello");
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.relativePath).toBe("CLAUDE.md");
       expect(files[0]?.existsGlobal).toBe(false);
@@ -177,48 +186,63 @@ if (import.meta.vitest) {
     });
 
     it("detects a file that exists in both", async () => {
+      // Given: settings.json in both global and project
       await writeFile(join(tmpGlobal, "settings.json"), "{}");
       await writeFile(join(tmpProject, "settings.json"), "{}");
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.existsGlobal).toBe(true);
       expect(files[0]?.existsProject).toBe(true);
     });
 
     it("shows skills/<name> as a directory entry", async () => {
+      // Given: a skill directory with a file inside it
       await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
       await writeFile(
         join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
         "# skill"
       );
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then: the skill dir appears as isDirectory=true
       const skill = files.find((f) => f.relativePath === "skills/my-debug");
       expect(skill).toBeDefined();
       expect(skill?.isDirectory).toBe(true);
     });
 
     it('"skills" parent dir itself should NOT appear', async () => {
+      // Given: only the bare skills/ dir (no children)
       await mkdir(join(tmpGlobal, "skills"), { recursive: true });
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then: "skills" entry is filtered out
       expect(files.find((f) => f.relativePath === "skills")).toBeUndefined();
     });
 
     it("individual files inside skills/<name>/ are excluded", async () => {
+      // Given: skills/my-debug/SKILL.md (depth 3)
       await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
       await writeFile(
         join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
         "# skill"
       );
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then: only the skill dir appears, not the file inside it
       expect(
         files.find((f) => f.relativePath === "skills/my-debug/SKILL.md")
       ).toBeUndefined();
     });
 
     it("files come before directories in sorted output", async () => {
+      // Given: a plain file and a skill directory exist
       await writeFile(join(tmpGlobal, "settings.json"), "{}");
       await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
+      // When
       const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      // Then: settings.json index is lower than skills/my-debug index
       const fileIdx = files.findIndex(
         (f) => f.relativePath === "settings.json"
       );
@@ -227,12 +251,26 @@ if (import.meta.vitest) {
       );
       expect(fileIdx).toBeLessThan(dirIdx);
     });
+
+    it("returns empty when neither directory exists on disk", async () => {
+      // Given: both roots point to non-existent paths
+      // When
+      const { files } = await scanWithRoots(
+        "/tmp/cccport-nonexistent-global",
+        "/tmp/cccport-nonexistent-project"
+      );
+      // Then
+      expect(files).toHaveLength(0);
+    });
   });
 
   describe("scanClaudeDirs", () => {
     it("accepts custom globalRoot for testing", async () => {
+      // Given: settings.json in the custom global root
       await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      // When
       const result = await scanClaudeDirs(tmpProject, tmpGlobal);
+      // Then
       expect(result.globalRoot).toBe(tmpGlobal);
       expect(result.files.some((f) => f.relativePath === "settings.json")).toBe(
         true
@@ -240,7 +278,10 @@ if (import.meta.vitest) {
     });
 
     it("uses os.homedir()/.claude when globalRoot is omitted", async () => {
+      // Given: no explicit globalRoot
+      // When
       const result = await scanClaudeDirs(tmpProject);
+      // Then: globalRoot contains the default .claude suffix
       expect(result.globalRoot).toContain(".claude");
     });
   });
