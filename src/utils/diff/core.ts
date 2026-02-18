@@ -92,33 +92,44 @@ if (import.meta.vitest) {
 
   describe("diffText", () => {
     it("returns identical=true when both inputs are null", () => {
+      // when
       const result = diffText(null, null);
+      // then
       expect(result.identical).toBe(true);
       expect(result.summary).toBe("Both files missing");
     });
 
     it("returns identical=true for equal strings", () => {
+      // given
       const content = "hello\nworld";
+      // when
       const result = diffText(content, content);
+      // then
       expect(result.identical).toBe(true);
     });
 
     it("shows only + lines when A is null", () => {
+      // when
       const result = diffText(null, "line1\nline2");
+      // then
       expect(result.identical).toBe(false);
       expect(result.summary).toBe("Only exists in destination");
       expect(result.lines.every((l) => l.startsWith("+"))).toBe(true);
     });
 
     it("shows only - lines when B is null", () => {
+      // when
       const result = diffText("line1\nline2", null);
+      // then
       expect(result.identical).toBe(false);
       expect(result.summary).toBe("Only exists in source");
       expect(result.lines.every((l) => l.startsWith("-"))).toBe(true);
     });
 
     it("shows added and removed lines for different content", () => {
+      // when
       const result = diffText("hello\nworld", "hello\nearth");
+      // then
       expect(result.identical).toBe(false);
       expect(result.summary).toContain("line");
       expect(result.lines.some((l) => l.startsWith("+"))).toBe(true);
@@ -128,13 +139,16 @@ if (import.meta.vitest) {
 
   describe("diffJsonObjects", () => {
     it("returns identical=true for equal objects", () => {
+      // given
       const obj = { key: 1, flag: true };
-      const result = diffJsonObjects(obj, obj);
-      expect(result.identical).toBe(true);
+      // when / then
+      expect(diffJsonObjects(obj, obj).identical).toBe(true);
     });
 
     it("reports added key when only in B", () => {
+      // when
       const result = diffJsonObjects({ a: 1 }, { a: 1, b: 2 });
+      // then
       expect(result.identical).toBe(false);
       expect(
         result.lines.some((l) => l.startsWith("+") && l.includes('"b"'))
@@ -142,7 +156,9 @@ if (import.meta.vitest) {
     });
 
     it("reports removed key when only in A", () => {
+      // when
       const result = diffJsonObjects({ a: 1, old: true }, { a: 1 });
+      // then
       expect(result.identical).toBe(false);
       expect(
         result.lines.some((l) => l.startsWith("-") && l.includes('"old"'))
@@ -150,7 +166,9 @@ if (import.meta.vitest) {
     });
 
     it("reports changed value with - (old) and + (new) lines", () => {
+      // when
       const result = diffJsonObjects({ key: 1 }, { key: 2 });
+      // then
       expect(
         result.lines.some((l) => l.startsWith("-") && l.includes('"key"'))
       ).toBe(true);
@@ -160,7 +178,9 @@ if (import.meta.vitest) {
     });
 
     it("signals fallback when passed null (caller must use text diff)", () => {
+      // when
       const result = diffJsonObjects(null, { key: 1 });
+      // then
       expect(result.identical).toBe(false);
       expect(result.lines).toHaveLength(0);
       expect(result.summary).toBe("");

@@ -111,6 +111,7 @@ if (import.meta.vitest) {
 
   describe("generateMigrationPrompt", () => {
     it("destination-missing: includes source content for copy", async () => {
+      // given
       await using g = await createFixture({
         "settings.json": '{"model": "claude-3-5-sonnet"}',
       });
@@ -123,15 +124,18 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
+      // when
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // then
       expect(prompt).toContain("settings.json");
       expect(prompt).toContain("claude-3-5-sonnet");
     });
 
     it("source-missing: reports missing source without crashing", async () => {
+      // given
       await using g = await createFixture({});
       await using p = await createFixture({});
       const file: ClaudeFile = {
@@ -142,14 +146,17 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
+      // when
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // then
       expect(prompt).toContain("Source file does not exist");
     });
 
     it("both-exist: includes both contents for merge", async () => {
+      // given
       await using g = await createFixture({
         "settings.json": '{"model": "claude-opus"}',
       });
@@ -164,16 +171,19 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
+      // when
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // then
       expect(prompt).toContain("claude-opus");
       expect(prompt).toContain("dark");
       expect(prompt).toContain("Merge");
     });
 
     it("directory: generates directory-specific instructions", async () => {
+      // given
       await using g = await createFixture({});
       await using p = await createFixture({});
       const file: ClaudeFile = {
@@ -184,15 +194,18 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "skills/my-debug"),
         projectPath: join(p.path, "skills/my-debug"),
       };
+      // when
       const prompt = await generateMigrationPrompt(file, {
         from: "project",
         to: "global",
       });
+      // then
       expect(prompt).toContain("skills/my-debug");
       expect(prompt).toContain("directory");
     });
 
     it("i18n: uses Japanese labels when locale is ja", async () => {
+      // given
       await initI18n("ja");
       await using g = await createFixture({ "settings.json": "{}" });
       await using p = await createFixture({});
@@ -204,10 +217,12 @@ if (import.meta.vitest) {
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
       };
+      // when
       const prompt = await generateMigrationPrompt(file, {
         from: "global",
         to: "project",
       });
+      // then
       expect(prompt).toContain("グローバル");
     });
   });
