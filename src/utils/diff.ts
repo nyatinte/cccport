@@ -146,8 +146,8 @@ function parseJsoncSafe(raw: string): Record<string, unknown> | null {
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, beforeEach, afterEach } = import.meta.vitest;
-  const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+  const { describe, it, expect } = import.meta.vitest;
+  const { createFixture } = await import("fs-fixture");
   const { join } = await import("node:path");
 
   // ── diffText (pure, no I/O) ────────────────────────────────────────────────
@@ -263,37 +263,33 @@ if (import.meta.vitest) {
 
   // ── diffFiles / diffJsonFiles (I/O wrappers) ───────────────────────────────
 
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp("/tmp/cccport-diff-");
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true });
-  });
-
   describe("diffFiles", () => {
     it("returns identical=true for files with equal content", async () => {
       // Given
-      const a = join(tmpDir, "a.txt");
-      const b = join(tmpDir, "b.txt");
-      await writeFile(a, "hello\nworld");
-      await writeFile(b, "hello\nworld");
+      await using fixture = await createFixture({
+        "a.txt": "hello\nworld",
+        "b.txt": "hello\nworld",
+      });
       // When
-      const result = await diffFiles(a, b);
+      const result = await diffFiles(
+        join(fixture.path, "a.txt"),
+        join(fixture.path, "b.txt")
+      );
       // Then
       expect(result.identical).toBe(true);
     });
 
     it("reports differences when file content diverges", async () => {
       // Given
-      const a = join(tmpDir, "a.txt");
-      const b = join(tmpDir, "b.txt");
-      await writeFile(a, "hello\nworld");
-      await writeFile(b, "hello\nearth");
+      await using fixture = await createFixture({
+        "a.txt": "hello\nworld",
+        "b.txt": "hello\nearth",
+      });
       // When
-      const result = await diffFiles(a, b);
+      const result = await diffFiles(
+        join(fixture.path, "a.txt"),
+        join(fixture.path, "b.txt")
+      );
       // Then
       expect(result.identical).toBe(false);
       expect(result.summary).toContain("line");
@@ -301,11 +297,12 @@ if (import.meta.vitest) {
 
     it("reports only + lines when source file does not exist", async () => {
       // Given: A is missing, B exists
-      const a = join(tmpDir, "missing.txt");
-      const b = join(tmpDir, "b.txt");
-      await writeFile(b, "hello");
+      await using fixture = await createFixture({ "b.txt": "hello" });
       // When
-      const result = await diffFiles(a, b);
+      const result = await diffFiles(
+        join(fixture.path, "missing.txt"),
+        join(fixture.path, "b.txt")
+      );
       // Then
       expect(result.identical).toBe(false);
       expect(result.lines.every((l) => l.startsWith("+"))).toBe(true);
@@ -313,11 +310,12 @@ if (import.meta.vitest) {
 
     it("reports only - lines when destination file does not exist", async () => {
       // Given: A exists, B is missing
-      const a = join(tmpDir, "a.txt");
-      const b = join(tmpDir, "missing.txt");
-      await writeFile(a, "hello");
+      await using fixture = await createFixture({ "a.txt": "hello" });
       // When
-      const result = await diffFiles(a, b);
+      const result = await diffFiles(
+        join(fixture.path, "a.txt"),
+        join(fixture.path, "missing.txt")
+      );
       // Then
       expect(result.identical).toBe(false);
       expect(result.lines.every((l) => l.startsWith("-"))).toBe(true);
@@ -327,24 +325,30 @@ if (import.meta.vitest) {
   describe("diffJsonFiles", () => {
     it("returns identical=true for files with equal JSON", async () => {
       // Given
-      const a = join(tmpDir, "a.json");
-      const b = join(tmpDir, "b.json");
-      await writeFile(a, '{"key": 1}');
-      await writeFile(b, '{"key": 1}');
+      await using fixture = await createFixture({
+        "a.json": '{"key": 1}',
+        "b.json": '{"key": 1}',
+      });
       // When
-      const result = await diffJsonFiles(a, b);
+      const result = await diffJsonFiles(
+        join(fixture.path, "a.json"),
+        join(fixture.path, "b.json")
+      );
       // Then
       expect(result.identical).toBe(true);
     });
 
     it("reports key-level differences between JSON files", async () => {
       // Given
-      const a = join(tmpDir, "a.json");
-      const b = join(tmpDir, "b.json");
-      await writeFile(a, '{"key": 1, "old": true}');
-      await writeFile(b, '{"key": 2, "new": true}');
+      await using fixture = await createFixture({
+        "a.json": '{"key": 1, "old": true}',
+        "b.json": '{"key": 2, "new": true}',
+      });
       // When
-      const result = await diffJsonFiles(a, b);
+      const result = await diffJsonFiles(
+        join(fixture.path, "a.json"),
+        join(fixture.path, "b.json")
+      );
       // Then
       expect(result.identical).toBe(false);
       expect(result.lines.some((l) => l.includes('"key"'))).toBe(true);
@@ -352,12 +356,15 @@ if (import.meta.vitest) {
 
     it("falls back to text diff when one file is not valid JSON", async () => {
       // Given: B is plain text, not parseable as JSON
-      const a = join(tmpDir, "a.json");
-      const b = join(tmpDir, "b.json");
-      await writeFile(a, '{"key": 1}');
-      await writeFile(b, "not json");
+      await using fixture = await createFixture({
+        "a.json": '{"key": 1}',
+        "b.json": "not json",
+      });
       // When
-      const result = await diffJsonFiles(a, b);
+      const result = await diffJsonFiles(
+        join(fixture.path, "a.json"),
+        join(fixture.path, "b.json")
+      );
       // Then: summary uses "line" wording (text diff), not "key" wording
       expect(result.identical).toBe(false);
       expect(result.summary).toContain("line");
@@ -365,10 +372,11 @@ if (import.meta.vitest) {
 
     it("returns identical=true when both files are missing", async () => {
       // Given: neither file exists
+      await using fixture = await createFixture({});
       // When
       const result = await diffJsonFiles(
-        join(tmpDir, "x.json"),
-        join(tmpDir, "y.json")
+        join(fixture.path, "x.json"),
+        join(fixture.path, "y.json")
       );
       // Then
       expect(result.identical).toBe(true);
@@ -376,10 +384,12 @@ if (import.meta.vitest) {
 
     it("falls back to text diff when source file is missing", async () => {
       // Given: A is missing, B is valid JSON
-      const b = join(tmpDir, "b.json");
-      await writeFile(b, '{"key": 1}');
+      await using fixture = await createFixture({ "b.json": '{"key": 1}' });
       // When
-      const result = await diffJsonFiles(join(tmpDir, "missing.json"), b);
+      const result = await diffJsonFiles(
+        join(fixture.path, "missing.json"),
+        join(fixture.path, "b.json")
+      );
       // Then: diffText fallback → all lines start with +, summary is text-diff wording
       expect(result.identical).toBe(false);
       expect(result.summary).toBe("Only exists in destination");
@@ -388,10 +398,12 @@ if (import.meta.vitest) {
 
     it("falls back to text diff when destination file is missing", async () => {
       // Given: A is valid JSON, B is missing
-      const a = join(tmpDir, "a.json");
-      await writeFile(a, '{"key": 1}');
+      await using fixture = await createFixture({ "a.json": '{"key": 1}' });
       // When
-      const result = await diffJsonFiles(a, join(tmpDir, "missing.json"));
+      const result = await diffJsonFiles(
+        join(fixture.path, "a.json"),
+        join(fixture.path, "missing.json")
+      );
       // Then: diffText fallback → all lines start with -, summary is text-diff wording
       expect(result.identical).toBe(false);
       expect(result.summary).toBe("Only exists in source");

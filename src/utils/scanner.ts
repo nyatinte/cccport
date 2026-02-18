@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import type { ClaudeFile, ScanResult } from "../types.js";
@@ -137,20 +137,8 @@ export function scanClaudeDirs(
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, beforeEach, afterEach } = import.meta.vitest;
-
-  let tmpGlobal: string;
-  let tmpProject: string;
-
-  beforeEach(async () => {
-    tmpGlobal = await mkdtemp("/tmp/cccport-global-");
-    tmpProject = await mkdtemp("/tmp/cccport-project-");
-  });
-
-  afterEach(async () => {
-    await rm(tmpGlobal, { recursive: true });
-    await rm(tmpProject, { recursive: true });
-  });
+  const { describe, it, expect } = import.meta.vitest;
+  const { createFixture } = await import("fs-fixture");
 
   // Direct unit tests for the module-private filter function
   describe("shouldInclude", () => {
@@ -185,17 +173,20 @@ if (import.meta.vitest) {
   describe("scanWithRoots", () => {
     it("returns empty files when both dirs are empty", async () => {
       // Given: both global and project .claude dirs exist but are empty
+      await using g = await createFixture({});
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then
       expect(files).toHaveLength(0);
     });
 
     it("detects a file that exists only in global", async () => {
       // Given: settings.json only in global
-      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      await using g = await createFixture({ "settings.json": "{}" });
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.relativePath).toBe("settings.json");
@@ -205,9 +196,10 @@ if (import.meta.vitest) {
 
     it("detects a file that exists only in project", async () => {
       // Given: CLAUDE.md only in project
-      await writeFile(join(tmpProject, "CLAUDE.md"), "# hello");
+      await using g = await createFixture({});
+      await using p = await createFixture({ "CLAUDE.md": "# hello" });
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.relativePath).toBe("CLAUDE.md");
@@ -217,10 +209,10 @@ if (import.meta.vitest) {
 
     it("detects a file that exists in both", async () => {
       // Given: settings.json in both global and project
-      await writeFile(join(tmpGlobal, "settings.json"), "{}");
-      await writeFile(join(tmpProject, "settings.json"), "{}");
+      await using g = await createFixture({ "settings.json": "{}" });
+      await using p = await createFixture({ "settings.json": "{}" });
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then
       expect(files).toHaveLength(1);
       expect(files[0]?.existsGlobal).toBe(true);
@@ -229,13 +221,12 @@ if (import.meta.vitest) {
 
     it("shows skills/<name> as a directory entry", async () => {
       // Given: a skill directory with a file inside it
-      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
-      await writeFile(
-        join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
-        "# skill"
-      );
+      await using g = await createFixture({
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then: the skill dir appears as isDirectory=true
       const skill = files.find((f) => f.relativePath === "skills/my-debug");
       expect(skill).toBeDefined();
@@ -244,22 +235,23 @@ if (import.meta.vitest) {
 
     it('"skills" parent dir itself should NOT appear', async () => {
       // Given: only the bare skills/ dir (no children)
-      await mkdir(join(tmpGlobal, "skills"), { recursive: true });
+      await using g = await createFixture({});
+      await g.mkdir("skills");
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then: "skills" entry is filtered out
       expect(files.find((f) => f.relativePath === "skills")).toBeUndefined();
     });
 
     it("individual files inside skills/<name>/ are excluded", async () => {
       // Given: skills/my-debug/SKILL.md (depth 3)
-      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
-      await writeFile(
-        join(tmpGlobal, "skills", "my-debug", "SKILL.md"),
-        "# skill"
-      );
+      await using g = await createFixture({
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then: only the skill dir appears, not the file inside it
       expect(
         files.find((f) => f.relativePath === "skills/my-debug/SKILL.md")
@@ -268,10 +260,13 @@ if (import.meta.vitest) {
 
     it("files come before directories in sorted output", async () => {
       // Given: a plain file and a skill directory exist
-      await writeFile(join(tmpGlobal, "settings.json"), "{}");
-      await mkdir(join(tmpGlobal, "skills", "my-debug"), { recursive: true });
+      await using g = await createFixture({
+        "settings.json": "{}",
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then: settings.json index is lower than skills/my-debug index
       const fileIdx = files.findIndex(
         (f) => f.relativePath === "settings.json"
@@ -284,10 +279,13 @@ if (import.meta.vitest) {
 
     it("multiple files of the same type are sorted alphabetically", async () => {
       // Given: two plain files with alphabetically distinct names
-      await writeFile(join(tmpGlobal, "z-last.md"), "z");
-      await writeFile(join(tmpGlobal, "a-first.md"), "a");
+      await using g = await createFixture({
+        "z-last.md": "z",
+        "a-first.md": "a",
+      });
+      await using p = await createFixture({});
       // When
-      const { files } = await scanWithRoots(tmpGlobal, tmpProject);
+      const { files } = await scanWithRoots(g.path, p.path);
       // Then: a-first comes before z-last (localeCompare branch in sort)
       const aIdx = files.findIndex((f) => f.relativePath === "a-first.md");
       const zIdx = files.findIndex((f) => f.relativePath === "z-last.md");
@@ -309,11 +307,12 @@ if (import.meta.vitest) {
   describe("scanClaudeDirs", () => {
     it("accepts custom globalRoot for testing", async () => {
       // Given: settings.json in the custom global root
-      await writeFile(join(tmpGlobal, "settings.json"), "{}");
+      await using g = await createFixture({ "settings.json": "{}" });
+      await using p = await createFixture({});
       // When
-      const result = await scanClaudeDirs(tmpProject, tmpGlobal);
+      const result = await scanClaudeDirs(p.path, g.path);
       // Then
-      expect(result.globalRoot).toBe(tmpGlobal);
+      expect(result.globalRoot).toBe(g.path);
       expect(result.files.some((f) => f.relativePath === "settings.json")).toBe(
         true
       );
@@ -321,8 +320,9 @@ if (import.meta.vitest) {
 
     it("uses os.homedir()/.claude when globalRoot is omitted", async () => {
       // Given: no explicit globalRoot
+      await using p = await createFixture({});
       // When
-      const result = await scanClaudeDirs(tmpProject);
+      const result = await scanClaudeDirs(p.path);
       // Then: globalRoot contains the default .claude suffix
       expect(result.globalRoot).toContain(".claude");
     });
