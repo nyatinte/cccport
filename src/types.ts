@@ -1,5 +1,3 @@
-// src/types.ts — shared types
-
 export interface ClaudeFile {
   /** Whether the file/dir exists in the global root */
   existsGlobal: boolean;
@@ -19,11 +17,4 @@ export interface ScanResult {
   files: ClaudeFile[];
   globalRoot: string;
   projectRoot: string;
-}
-
-export type CopyDirection = "global-to-project" | "project-to-global";
-
-export interface CopyOptions {
-  backupSuffix?: string;
-  direction: CopyDirection;
 }

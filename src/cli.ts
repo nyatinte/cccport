@@ -43,7 +43,20 @@ if (hasFlag(["-v", "--version"])) {
 }
 
 const projectCwd = getFlag(["-p", "--project"]) ?? process.cwd();
-const langArg = getFlag(["-l", "--lang"]) as "en" | "ja" | undefined;
+
+const VALID_LOCALES = ["en", "ja"] as const;
+type Locale = (typeof VALID_LOCALES)[number];
+const rawLang = getFlag(["-l", "--lang"]);
+if (
+  rawLang !== undefined &&
+  !(VALID_LOCALES as readonly string[]).includes(rawLang)
+) {
+  console.error(
+    `Error: --lang must be one of: ${VALID_LOCALES.join(", ")} (got "${rawLang}")`
+  );
+  process.exit(1);
+}
+const langArg = rawLang as Locale | undefined;
 
 await initI18n(langArg);
 const scan = await scanClaudeDirs(projectCwd);

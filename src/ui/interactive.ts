@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readdir, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import chalk from "chalk";
 import { t } from "../i18n/index.js";
@@ -177,14 +177,10 @@ async function handleCopy(
 
   const backupPath = `${dst}.bak.${Date.now()}`;
   await copyFile(dst, backupPath).catch(() => null); // only backs up if dst exists
-  if (
-    await import("node:fs/promises").then((m) =>
-      m
-        .stat(backupPath)
-        .then(() => true)
-        .catch(() => false)
-    )
-  ) {
+  const backedUp = await stat(backupPath)
+    .then(() => true)
+    .catch(() => false);
+  if (backedUp) {
     console.log(chalk.dim(`  ${t("copy_backed_up")} ${backupPath}`));
   }
 
