@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { parse as parseJsonc } from "jsonc-parser";
+import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 import type { DiffResult } from "./core.js";
 import { diffJsonObjects, diffText } from "./core.js";
 
 const parseJsoncSafe = (raw: string): Record<string, unknown> | null => {
-  const errors: unknown[] = [];
+  const errors: ParseError[] = [];
   const result = parseJsonc(raw, errors);
   if (
     errors.length > 0 ||
