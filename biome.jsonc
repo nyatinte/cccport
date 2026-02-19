@@ -4,6 +4,7 @@
   "linter": {
     "rules": {
       "style": {
+        // ultracite defaults to "interface"; project uses "type" instead
         "useConsistentTypeDefinitions": {
           "level": "error",
           "options": { "style": "type" }
