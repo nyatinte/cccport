@@ -16,8 +16,9 @@
     "check": "ultracite check",
     "fix": "ultracite fix"
   },
+  "packageManager": "pnpm@10.30.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "dependencies": {
     "chalk": "^5.3.0",
