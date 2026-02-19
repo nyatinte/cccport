@@ -1,20 +1,21 @@
 import { readFile } from "node:fs/promises";
-import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 import type { DiffResult } from "./core.js";
 import { diffJsonObjects, diffText } from "./core.js";
 
-const parseJsoncSafe = (raw: string): Record<string, unknown> | null => {
-  const errors: ParseError[] = [];
-  const result = parseJsonc(raw, errors);
-  if (
-    errors.length > 0 ||
-    typeof result !== "object" ||
-    result === null ||
-    Array.isArray(result)
-  ) {
+const safeParseJson = (raw: string): Record<string, unknown> | null => {
+  try {
+    const result: unknown = JSON.parse(raw);
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      Array.isArray(result)
+    ) {
+      return null;
+    }
+    return result as Record<string, unknown>;
+  } catch {
     return null;
   }
-  return result as Record<string, unknown>;
 };
 
 export const diffFiles = async (
@@ -45,8 +46,8 @@ export const diffJsonFiles = async (
     };
   }
 
-  const objA = rawA ? parseJsoncSafe(rawA) : null;
-  const objB = rawB ? parseJsoncSafe(rawB) : null;
+  const objA = rawA ? safeParseJson(rawA) : null;
+  const objB = rawB ? safeParseJson(rawB) : null;
 
   // Fall back to text diff when either side is unparseable
   if (objA === null || objB === null) {
