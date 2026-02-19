@@ -1,8 +1,8 @@
-export type DiffResult = {
+export interface DiffResult {
   identical: boolean;
   lines: string[];
   summary: string;
-};
+}
 
 export const diffText = (
   rawA: string | null,

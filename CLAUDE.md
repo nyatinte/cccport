@@ -44,8 +44,8 @@ src/
 ## Coding conventions
 
 **Types**
-- Use `type` for all type definitions, not `interface`
-- Biome enforces this via `useConsistentTypeDefinitions: { style: "type" }`
+- Use `interface` for object type definitions; `type` for unions/aliases
+- Biome enforces this via `useConsistentTypeDefinitions` (ultracite default)
 
 **Functions**
 - Arrow functions everywhere; no `function` declarations

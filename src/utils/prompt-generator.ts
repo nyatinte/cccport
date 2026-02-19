@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import { t } from "../i18n/index.js";
 import type { ClaudeFile } from "../types.js";
 
-export type PromptDirection = {
+export interface PromptDirection {
   from: "global" | "project";
   to: "global" | "project";
-};
+}
 
 export const generateMigrationPrompt = async (
   file: ClaudeFile,

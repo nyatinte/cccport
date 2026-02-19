@@ -1,9 +1,9 @@
 // enquirer has no @types package — cast through unknown to avoid polluting callers with `any`
 import Enquirer from "enquirer";
 
-type EnquirerInstance = {
+interface EnquirerInstance {
   prompt(o: Record<string, unknown>): Promise<Record<string, unknown>>;
-};
+}
 
 const makeEnquirer = (): EnquirerInstance =>
   new (Enquirer as unknown as new () => EnquirerInstance)();
