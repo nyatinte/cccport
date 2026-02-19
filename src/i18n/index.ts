@@ -51,101 +51,77 @@ export const currentLocale = (): Locale => _locale;
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, afterEach } = import.meta.vitest;
+  const { describe, it, expect, afterEach, vi } = import.meta.vitest;
 
   describe("detectLocale", () => {
-    const orig = { ...process.env };
     afterEach(() => {
-      for (const key of [
-        "CLAUDE_CONFIG_LANG",
-        "LANG",
-        "LC_ALL",
-        "LC_MESSAGES",
-      ]) {
-        if (key in orig) {
-          process.env[key] = orig[key];
-        } else {
-          delete process.env[key];
-        }
-      }
+      vi.unstubAllEnvs();
     });
 
     it("defaults to en when no locale env vars are set", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LANG;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LC_ALL;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LC_MESSAGES;
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", undefined);
+      vi.stubEnv("LC_ALL", undefined);
+      vi.stubEnv("LC_MESSAGES", undefined);
       // when / then
       expect(detectLocale()).toBe("en");
     });
 
     it("returns ja when CLAUDE_CONFIG_LANG=ja", () => {
       // given
-      process.env.CLAUDE_CONFIG_LANG = "ja";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", "ja");
       // when / then
       expect(detectLocale()).toBe("ja");
     });
 
     it("returns ja when LANG=ja_JP.UTF-8 and CLAUDE_CONFIG_LANG unset", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      process.env.LANG = "ja_JP.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", "ja_JP.UTF-8");
       // when / then
       expect(detectLocale()).toBe("ja");
     });
 
     it("returns en when LANG=en_US.UTF-8 and CLAUDE_CONFIG_LANG unset", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      process.env.LANG = "en_US.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", "en_US.UTF-8");
       // when / then
       expect(detectLocale()).toBe("en");
     });
 
     it("CLAUDE_CONFIG_LANG takes priority over LANG", () => {
       // given
-      process.env.CLAUDE_CONFIG_LANG = "ja";
-      process.env.LANG = "en_US.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", "ja");
+      vi.stubEnv("LANG", "en_US.UTF-8");
       // when / then
       expect(detectLocale()).toBe("ja");
     });
 
     it("defaults to en when locale is an unknown language code", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      process.env.LANG = "fr_FR.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", "fr_FR.UTF-8");
       // when / then
       expect(detectLocale()).toBe("en");
     });
 
     it("falls back to LC_ALL when CLAUDE_CONFIG_LANG and LANG unset", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LANG;
-      process.env.LC_ALL = "ja_JP.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", undefined);
+      vi.stubEnv("LC_ALL", "ja_JP.UTF-8");
       // when / then
       expect(detectLocale()).toBe("ja");
     });
 
     it("falls back to LC_MESSAGES when higher-priority vars unset", () => {
       // given
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LANG;
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.LC_ALL;
-      process.env.LC_MESSAGES = "ja_JP.UTF-8";
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LANG", undefined);
+      vi.stubEnv("LC_ALL", undefined);
+      vi.stubEnv("LC_MESSAGES", "ja_JP.UTF-8");
       // when / then
       expect(detectLocale()).toBe("ja");
     });
@@ -160,15 +136,15 @@ if (import.meta.vitest) {
 
     it("picks up locale from env when called without an argument", async () => {
       // given
-      process.env.LANG = "ja_JP.UTF-8";
-      // biome-ignore lint/performance/noDelete: process.env needs delete to actually unset a key
-      delete process.env.CLAUDE_CONFIG_LANG;
+      vi.stubEnv("LANG", "ja_JP.UTF-8");
+      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
       // when
       await initI18n();
       // then
       expect(currentLocale()).toBe("ja");
       // Restore to en for subsequent tests
       await initI18n("en");
+      vi.unstubAllEnvs();
     });
 
     it("en: t() returns English strings after initI18n('en')", async () => {

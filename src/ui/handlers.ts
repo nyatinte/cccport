@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import chalk from "chalk";
 import { t } from "../i18n/index.js";
 import type { ClaudeFile } from "../types.js";
-import { diffFiles, diffJsonFiles } from "../utils/diff/index.js";
+import { diffFiles, diffJsonFiles } from "../utils/diff/files.js";
 import { confirm } from "../utils/enquirer-helpers.js";
 import { generateMigrationPrompt } from "../utils/prompt-generator.js";
 import type { Direction } from "./types.js";
