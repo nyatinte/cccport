@@ -1,5 +1,9 @@
+import i18next from "i18next";
+import { messages as en } from "./en.js";
+import { messages as ja } from "./ja.js";
+
 export type Locale = "en" | "ja";
-export type Messages = typeof import("./en.js").messages;
+export type Messages = typeof en;
 
 /**
  * Detect locale from environment variables.
@@ -26,28 +30,31 @@ export const detectLocale = (): Locale => {
   return "en";
 };
 
-let _messages: Messages | null = null;
-let _locale: Locale = "en";
-
 export const initI18n = async (locale?: Locale): Promise<void> => {
-  _locale = locale ?? detectLocale();
-  if (_locale === "ja") {
-    const mod = await import("./ja.js");
-    _messages = mod.messages as unknown as Messages;
+  const lng = locale ?? detectLocale();
+  if (i18next.isInitialized) {
+    await i18next.changeLanguage(lng);
   } else {
-    const mod = await import("./en.js");
-    _messages = mod.messages;
+    await i18next.init({
+      lng,
+      resources: {
+        en: { translation: en },
+        ja: { translation: ja },
+      },
+      interpolation: { escapeValue: false },
+      showSupportNotice: false,
+    });
   }
 };
 
 export const t = (key: keyof Messages): string => {
-  if (!_messages) {
+  if (!i18next.isInitialized) {
     throw new Error("i18n not initialized. Call initI18n() first.");
   }
-  return _messages[key] ?? key;
+  return i18next.t(key) as string;
 };
 
-export const currentLocale = (): Locale => _locale;
+export const currentLocale = (): Locale => i18next.language as Locale;
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
@@ -165,11 +172,11 @@ if (import.meta.vitest) {
 
     it("ja messages cover all en keys (no missing translations)", async () => {
       // given
-      const en = await import("./en.js");
-      const ja = await import("./ja.js");
+      const enMod = await import("./en.js");
+      const jaMod = await import("./ja.js");
       // when / then
-      expect(Object.keys(ja.messages).sort()).toEqual(
-        Object.keys(en.messages).sort()
+      expect(Object.keys(jaMod.messages).sort()).toEqual(
+        Object.keys(enMod.messages).sort()
       );
     });
 
