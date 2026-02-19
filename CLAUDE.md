@@ -22,7 +22,8 @@ src/
   cli.ts                    # entry point — arg parsing, i18n init, scan, runInteractive
   types.ts                  # ClaudeFile, ScanResult
   i18n/
-    index.ts                # detectLocale, initI18n, t(), currentLocale
+    index.ts                # initI18n, t(), currentLocale
+    cli-language-detector.ts  # CliLanguageDetector (i18next LanguageDetectorModule)
     en.ts / ja.ts           # message catalogs
   ui/
     types.ts                # Action, Direction

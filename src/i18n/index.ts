@@ -1,42 +1,21 @@
 import i18next from "i18next";
+import { CliLanguageDetector } from "./cli-language-detector.js";
 import { messages as en } from "./en.js";
 import { messages as ja } from "./ja.js";
 
 export type Locale = "en" | "ja";
 export type Messages = typeof en;
 
-/**
- * Detect locale from environment variables.
- * Priority: CLAUDE_CONFIG_LANG > LANG > LC_ALL > LC_MESSAGES > 'en'
- */
-export const detectLocale = (): Locale => {
-  const candidates = [
-    process.env.CLAUDE_CONFIG_LANG,
-    process.env.LANG,
-    process.env.LC_ALL,
-    process.env.LC_MESSAGES,
-  ];
-  for (const c of candidates) {
-    if (!c) {
-      continue;
-    }
-    if (c.startsWith("ja")) {
-      return "ja";
-    }
-    if (c.startsWith("en")) {
-      return "en";
-    }
-  }
-  return "en";
-};
+i18next.use(CliLanguageDetector);
 
 export const initI18n = async (locale?: Locale): Promise<void> => {
-  const lng = locale ?? detectLocale();
   if (i18next.isInitialized) {
-    await i18next.changeLanguage(lng);
+    await i18next.changeLanguage(locale ?? i18next.language);
   } else {
     await i18next.init({
-      lng,
+      ...(locale ? { lng: locale } : {}),
+      fallbackLng: "en",
+      supportedLngs: ["en", "ja"],
       resources: {
         en: { translation: en },
         ja: { translation: ja },
@@ -58,85 +37,10 @@ export const currentLocale = (): Locale => i18next.language as Locale;
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, afterEach, vi } = import.meta.vitest;
-
-  describe("detectLocale", () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it("defaults to en when no locale env vars are set", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", undefined);
-      vi.stubEnv("LC_ALL", undefined);
-      vi.stubEnv("LC_MESSAGES", undefined);
-      // when / then
-      expect(detectLocale()).toBe("en");
-    });
-
-    it("returns ja when CLAUDE_CONFIG_LANG=ja", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", "ja");
-      // when / then
-      expect(detectLocale()).toBe("ja");
-    });
-
-    it("returns ja when LANG=ja_JP.UTF-8 and CLAUDE_CONFIG_LANG unset", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", "ja_JP.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("ja");
-    });
-
-    it("returns en when LANG=en_US.UTF-8 and CLAUDE_CONFIG_LANG unset", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", "en_US.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("en");
-    });
-
-    it("CLAUDE_CONFIG_LANG takes priority over LANG", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", "ja");
-      vi.stubEnv("LANG", "en_US.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("ja");
-    });
-
-    it("defaults to en when locale is an unknown language code", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", "fr_FR.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("en");
-    });
-
-    it("falls back to LC_ALL when CLAUDE_CONFIG_LANG and LANG unset", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", undefined);
-      vi.stubEnv("LC_ALL", "ja_JP.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("ja");
-    });
-
-    it("falls back to LC_MESSAGES when higher-priority vars unset", () => {
-      // given
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
-      vi.stubEnv("LANG", undefined);
-      vi.stubEnv("LC_ALL", undefined);
-      vi.stubEnv("LC_MESSAGES", "ja_JP.UTF-8");
-      // when / then
-      expect(detectLocale()).toBe("ja");
-    });
-  });
+  const { describe, it, expect, vi } = import.meta.vitest;
 
   describe("initI18n + t()", () => {
     it("throws when t() is called before initI18n()", () => {
-      // _messages is null at module load (detectLocale tests above never call initI18n)
       // when / then
       expect(() => t("header_title")).toThrow("i18n not initialized");
     });
@@ -145,6 +49,8 @@ if (import.meta.vitest) {
       // given
       vi.stubEnv("LANG", "ja_JP.UTF-8");
       vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
+      vi.stubEnv("LC_ALL", undefined);
+      vi.stubEnv("LC_MESSAGES", undefined);
       // when
       await initI18n();
       // then
