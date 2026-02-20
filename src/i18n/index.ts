@@ -10,20 +10,23 @@ i18next.use(CliLanguageDetector);
 
 export const initI18n = async (locale?: Locale): Promise<void> => {
   if (i18next.isInitialized) {
-    await i18next.changeLanguage(locale ?? i18next.language);
-  } else {
-    await i18next.init({
-      ...(locale ? { lng: locale } : {}),
-      fallbackLng: "en",
-      supportedLngs: ["en", "ja"],
-      resources: {
-        en: { translation: en },
-        ja: { translation: ja },
-      },
-      interpolation: { escapeValue: false },
-      showSupportNotice: false,
-    });
+    // Only change if an explicit locale was requested; otherwise keep current.
+    if (locale) {
+      await i18next.changeLanguage(locale);
+    }
+    return;
   }
+  await i18next.init({
+    ...(locale ? { lng: locale } : {}),
+    fallbackLng: "en",
+    supportedLngs: ["en", "ja"],
+    resources: {
+      en: { translation: en },
+      ja: { translation: ja },
+    },
+    interpolation: { escapeValue: false },
+    showSupportNotice: false,
+  });
 };
 
 export const t = (key: keyof Messages): string => {
@@ -33,13 +36,20 @@ export const t = (key: keyof Messages): string => {
   return i18next.t(key) as string;
 };
 
-export const currentLocale = (): Locale => i18next.language as Locale;
+export const currentLocale = (): Locale => {
+  const lang = i18next.language;
+  if (lang !== "en" && lang !== "ja") {
+    throw new Error(`Unexpected language resolved by i18next: "${lang}"`);
+  }
+  return lang;
+};
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
   const { describe, it, expect, vi } = import.meta.vitest;
 
   describe("initI18n + t()", () => {
+    // NOTE: must run first — relies on i18next not yet being initialized in this module's singleton
     it("throws when t() is called before initI18n()", () => {
       // when / then
       expect(() => t("header_title")).toThrow("i18n not initialized");

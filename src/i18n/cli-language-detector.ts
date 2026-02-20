@@ -17,16 +17,22 @@ export class CliLanguageDetector implements LanguageDetectorModule {
   }
 
   detect(): string | readonly string[] | undefined {
-    // CLAUDE_CONFIG_LANG takes highest priority
+    // CLAUDE_CONFIG_LANG takes highest priority.
+    // Treated as a single value (no colon-separated list).
     const customLang = process.env.CLAUDE_CONFIG_LANG;
     if (customLang) {
-      const resolved = this.#resolveLocale(customLang);
-      if (resolved != null) {
-        return resolved;
+      const code = customLang.split(".")[0].split("_")[0];
+      if (code && this.#services.languageUtils.isSupportedCode(code)) {
+        return this.#services.languageUtils.formatLanguageCode(code);
       }
+      // Set but unrecognised — warn and fall through to shell locale detection
+      process.stderr.write(
+        `Warning: CLAUDE_CONFIG_LANG="${customLang}" is not a supported locale (en | ja). Falling back to shell locale detection.\n`
+      );
     }
 
-    // Standard shell locale vars (LC_ALL > LC_MESSAGES > LANG > LANGUAGE)
+    // Standard shell locale vars (LC_ALL > LC_MESSAGES > LANG > LANGUAGE).
+    // LANGUAGE supports colon-separated priority lists (POSIX).
     const shellLocale =
       process.env.LC_ALL ??
       process.env.LC_MESSAGES ??
@@ -156,6 +162,19 @@ if (import.meta.vitest) {
     it("falls back to LC_MESSAGES when LC_ALL unset", async () => {
       // when / then
       expect(await detect({ LC_MESSAGES: "ja_JP.UTF-8" })).toBe("ja");
+    });
+
+    it("warns to stderr and falls back when CLAUDE_CONFIG_LANG is unsupported", async () => {
+      // given
+      const spy = vi
+        .spyOn(process.stderr, "write")
+        .mockImplementation(() => true);
+      // when
+      const lang = await detect({ CLAUDE_CONFIG_LANG: "zh" });
+      // then
+      expect(lang).toBe("en");
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('"zh"'));
+      spy.mockRestore();
     });
   });
 }
