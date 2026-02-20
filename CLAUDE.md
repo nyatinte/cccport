@@ -88,7 +88,7 @@ afterEach(() => { vi.unstubAllEnvs(); });
 
 it("...", () => {
   vi.stubEnv("LANG", "ja_JP.UTF-8");
-  vi.stubEnv("CLAUDE_CONFIG_LANG", undefined); // unset
+  vi.stubEnv("LC_ALL", undefined); // unset
   // ...
 });
 ```

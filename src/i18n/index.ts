@@ -58,7 +58,6 @@ if (import.meta.vitest) {
     it("picks up locale from env when called without an argument", async () => {
       // given
       vi.stubEnv("LANG", "ja_JP.UTF-8");
-      vi.stubEnv("CLAUDE_CONFIG_LANG", undefined);
       vi.stubEnv("LC_ALL", undefined);
       vi.stubEnv("LC_MESSAGES", undefined);
       // when
