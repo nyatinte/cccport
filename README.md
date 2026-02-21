@@ -1,5 +1,7 @@
 # cccport
 
+[日本語](./README.ja.md)
+
 Interactive TUI for migrating Claude Code project settings (`.claude/`) between global (`~/.claude/`) and project-local roots.
 
 ## Requirements
