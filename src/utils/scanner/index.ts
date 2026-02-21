@@ -40,7 +40,7 @@ if (import.meta.vitest) {
   const { describe, it, expect, vi, afterEach } = import.meta.vitest;
   const { createFixture } = await import("fs-fixture");
 
-  describe("scanWithRoots", () => {
+  describe(scanWithRoots, () => {
     it("returns empty files when both dirs are empty", async () => {
       // given
       await using g = await createFixture({});

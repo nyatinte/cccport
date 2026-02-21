@@ -67,7 +67,7 @@ export const buildFileList = (
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
 
-  describe("shouldInclude", () => {
+  describe(shouldInclude, () => {
     it("includes a top-level file", () => {
       expect(shouldInclude("settings.json")).toBe(true);
       expect(shouldInclude("CLAUDE.md")).toBe(true);

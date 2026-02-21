@@ -109,7 +109,7 @@ if (import.meta.vitest) {
     await initI18n("en");
   });
 
-  describe("generateMigrationPrompt", () => {
+  describe(generateMigrationPrompt, () => {
     it("destination-missing: includes source content for copy", async () => {
       // given
       await using g = await createFixture({

@@ -90,7 +90,7 @@ export const diffJsonObjects = (
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
 
-  describe("diffText", () => {
+  describe(diffText, () => {
     it("returns identical=true when both inputs are null", () => {
       // when
       const result = diffText(null, null);
@@ -137,7 +137,7 @@ if (import.meta.vitest) {
     });
   });
 
-  describe("diffJsonObjects", () => {
+  describe(diffJsonObjects, () => {
     it("returns identical=true for equal objects", () => {
       // given
       const obj = { key: 1, flag: true };

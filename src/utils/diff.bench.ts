@@ -17,7 +17,7 @@ const OBJ_100 = Object.fromEntries(
 );
 const OBJ_100_CHANGED = { ...OBJ_100, key50: "changed" };
 
-describe("diffText", () => {
+describe(diffText, () => {
   bench("identical (short-circuit)", () => {
     diffText(SMALL_A, SMALL_A);
   });
@@ -39,7 +39,7 @@ describe("diffText", () => {
   });
 });
 
-describe("diffJsonObjects", () => {
+describe(diffJsonObjects, () => {
   bench("identical objects (10 keys)", () => {
     diffJsonObjects(OBJ_10, OBJ_10);
   });

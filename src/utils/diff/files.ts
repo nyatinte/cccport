@@ -63,7 +63,7 @@ if (import.meta.vitest) {
   const { createFixture } = await import("fs-fixture");
   const { join } = await import("node:path");
 
-  describe("diffFiles", () => {
+  describe(diffFiles, () => {
     it("returns identical=true for files with equal content", async () => {
       // given
       await using fixture = await createFixture({
@@ -122,7 +122,7 @@ if (import.meta.vitest) {
     });
   });
 
-  describe("diffJsonFiles", () => {
+  describe(diffJsonFiles, () => {
     it("returns identical=true for files with equal JSON", async () => {
       // given
       await using fixture = await createFixture({

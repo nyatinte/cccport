@@ -97,7 +97,7 @@ if (import.meta.vitest) {
     return inst.language;
   };
 
-  describe("CliLanguageDetector", () => {
+  describe(CliLanguageDetector, () => {
     afterEach(() => {
       vi.unstubAllEnvs();
     });

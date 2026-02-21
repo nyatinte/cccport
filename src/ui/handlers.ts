@@ -257,7 +257,7 @@ if (import.meta.vitest) {
   const { createFixture } = await import("fs-fixture");
   const { readdir: fsReaddir } = await import("node:fs/promises");
 
-  describe("copyDir", () => {
+  describe(copyDir, () => {
     it("copies all files to dst when dst does not exist", async () => {
       // given
       await using src = await createFixture({
@@ -295,7 +295,7 @@ if (import.meta.vitest) {
     });
   });
 
-  describe("diffDir", () => {
+  describe(diffDir, () => {
     it("reports src-only for a file that exists only in src", async () => {
       // given
       await using src = await createFixture({ "SKILL.md": "# skill" });
