@@ -31,11 +31,13 @@ export const scanWithRoots = async (
  * Scan ~/.claude (global) and <projectCwd>/.claude (project).
  * Global root: CLAUDE_CONFIG_DIR env var → ~/.claude
  */
-export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> =>
-  scanWithRoots(
-    process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR),
-    join(projectCwd, CLAUDE_DIR)
-  );
+export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> => {
+  const globalRoot =
+    process.env.CLAUDE_CONFIG_DIR !== undefined
+      ? process.env.CLAUDE_CONFIG_DIR
+      : join(homedir(), CLAUDE_DIR);
+  return scanWithRoots(globalRoot, join(projectCwd, CLAUDE_DIR));
+};
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
