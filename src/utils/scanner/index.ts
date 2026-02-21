@@ -173,7 +173,7 @@ if (import.meta.vitest) {
     });
   });
 
-  describe("resolveGlobalRoot", () => {
+  describe(resolveGlobalRoot, () => {
     afterEach(() => {
       vi.unstubAllEnvs();
     });
