@@ -36,13 +36,13 @@ export const scanClaudeDirs = (
   globalRoot?: string
 ): Promise<ScanResult> =>
   scanWithRoots(
-    globalRoot ?? join(homedir(), CLAUDE_DIR),
+    globalRoot ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR),
     join(projectCwd, CLAUDE_DIR)
   );
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect } = import.meta.vitest;
+  const { describe, it, expect, vi, afterEach } = import.meta.vitest;
   const { createFixture } = await import("fs-fixture");
 
   describe("scanWithRoots", () => {
@@ -179,6 +179,10 @@ if (import.meta.vitest) {
   });
 
   describe("scanClaudeDirs", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it("accepts custom globalRoot for testing", async () => {
       // given
       await using g = await createFixture({ "settings.json": "{}" });
@@ -199,6 +203,35 @@ if (import.meta.vitest) {
       const result = await scanClaudeDirs(p.path);
       // then
       expect(result.globalRoot).toContain(".claude");
+    });
+
+    it("uses CLAUDE_CONFIG_DIR env var when set", async () => {
+      // given
+      await using g = await createFixture({ "settings.json": "{}" });
+      vi.stubEnv("CLAUDE_CONFIG_DIR", g.path);
+      await using p = await createFixture({});
+      // when
+      const result = await scanClaudeDirs(p.path);
+      // then
+      expect(result.globalRoot).toBe(g.path);
+      expect(result.files.some((f) => f.relativePath === "settings.json")).toBe(
+        true
+      );
+    });
+
+    it("explicit globalRoot arg takes priority over CLAUDE_CONFIG_DIR", async () => {
+      // given
+      await using env = await createFixture({ "from-env.json": "{}" });
+      await using arg = await createFixture({ "from-arg.json": "{}" });
+      vi.stubEnv("CLAUDE_CONFIG_DIR", env.path);
+      await using p = await createFixture({});
+      // when
+      const result = await scanClaudeDirs(p.path, arg.path);
+      // then
+      expect(result.globalRoot).toBe(arg.path);
+      expect(result.files.some((f) => f.relativePath === "from-arg.json")).toBe(
+        true
+      );
     });
   });
 }
