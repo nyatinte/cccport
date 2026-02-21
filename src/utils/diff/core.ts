@@ -51,14 +51,9 @@ export const diffText = (
 };
 
 export const diffJsonObjects = (
-  objA: Record<string, unknown> | null,
-  objB: Record<string, unknown> | null
+  objA: Record<string, unknown>,
+  objB: Record<string, unknown>
 ): DiffResult => {
-  if (objA === null || objB === null) {
-    // Signal caller to fall back to text diff
-    return { identical: false, lines: [], summary: "" };
-  }
-
   const lines: string[] = [];
   for (const key of new Set([...Object.keys(objA), ...Object.keys(objB)])) {
     const valA = JSON.stringify(objA[key]);
@@ -175,15 +170,6 @@ if (import.meta.vitest) {
       expect(
         result.lines.some((l) => l.startsWith("+") && l.includes('"key"'))
       ).toBe(true);
-    });
-
-    it("signals fallback when passed null (caller must use text diff)", () => {
-      // when
-      const result = diffJsonObjects(null, { key: 1 });
-      // then
-      expect(result.identical).toBe(false);
-      expect(result.lines).toHaveLength(0);
-      expect(result.summary).toBe("");
     });
   });
 }

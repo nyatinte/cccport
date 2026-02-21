@@ -7,22 +7,25 @@ export interface PromptDirection {
   to: "global" | "project";
 }
 
+const readFileOrNull = (p: string): Promise<string | null> =>
+  readFile(p, "utf-8").catch(() => null);
+
+const sideLabel = (side: "global" | "project"): string =>
+  side === "global"
+    ? `${t("header_global")} (~/.claude)`
+    : `${t("header_project")} (.claude)`;
+
+const sidePath = (side: "global" | "project", file: ClaudeFile): string =>
+  side === "global" ? file.globalPath : file.projectPath;
+
 export const generateMigrationPrompt = async (
   file: ClaudeFile,
   direction: PromptDirection
 ): Promise<string> => {
-  const fromLabel =
-    direction.from === "global"
-      ? `${t("header_global")} (~/.claude)`
-      : `${t("header_project")} (.claude)`;
-  const toLabel =
-    direction.to === "global"
-      ? `${t("header_global")} (~/.claude)`
-      : `${t("header_project")} (.claude)`;
-
-  const fromPath =
-    direction.from === "global" ? file.globalPath : file.projectPath;
-  const toPath = direction.to === "global" ? file.globalPath : file.projectPath;
+  const fromLabel = sideLabel(direction.from);
+  const toLabel = sideLabel(direction.to);
+  const fromPath = sidePath(direction.from, file);
+  const toPath = sidePath(direction.to, file);
 
   if (file.isDirectory) {
     return [
@@ -43,8 +46,10 @@ export const generateMigrationPrompt = async (
     ].join("\n");
   }
 
-  const fromContent = await readFile(fromPath, "utf-8").catch(() => null);
-  const toContent = await readFile(toPath, "utf-8").catch(() => null);
+  const [fromContent, toContent] = await Promise.all([
+    readFileOrNull(fromPath),
+    readFileOrNull(toPath),
+  ]);
 
   const header = [
     `# Claude Config Migration: \`${file.relativePath}\``,

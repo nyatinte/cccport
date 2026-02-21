@@ -51,8 +51,4 @@ describe(diffJsonObjects, () => {
   bench("1 key changed (100 keys)", () => {
     diffJsonObjects(OBJ_100, OBJ_100_CHANGED);
   });
-
-  bench("null sentinel (immediate return)", () => {
-    diffJsonObjects(null, OBJ_10);
-  });
 });

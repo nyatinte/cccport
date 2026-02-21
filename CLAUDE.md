@@ -28,7 +28,7 @@ src/
   ui/
     types.ts                # Action, Direction
     selectors.ts            # pickFile, pickAction, pickDirection (enquirer prompts)
-    handlers.ts             # handleCopy, handleDiff, handlePrompt
+    handlers.ts             # handleCopy, handleDiff, handlePrompt, resolvePaths
     interactive.ts          # runInteractive (main TUI loop)
   utils/
     diff/
@@ -38,6 +38,7 @@ src/
       walk.ts               # pathExists, walkClaudeDir
       build.ts              # shouldInclude, buildFileList
       index.ts              # scanWithRoots, scanClaudeDirs (public API)
+    dir-ops.ts              # copyDir, diffDir, DirFileDiff (FS-level dir operations)
     enquirer-helpers.ts     # type-safe select<T> and confirm wrappers
     prompt-generator.ts     # generateMigrationPrompt (AI prompt text)
 ```

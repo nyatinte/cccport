@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 import type { DiffResult } from "./core.js";
 import { diffJsonObjects, diffText } from "./core.js";
 
+const readFileOrNull = (p: string): Promise<string | null> =>
+  readFile(p, "utf-8").catch(() => null);
+
 const safeParseJson = (raw: string): Record<string, unknown> | null => {
   try {
     const result: unknown = JSON.parse(raw);
@@ -23,8 +26,8 @@ export const diffFiles = async (
   pathB: string
 ): Promise<DiffResult> => {
   const [rawA, rawB] = await Promise.all([
-    readFile(pathA, "utf-8").catch(() => null),
-    readFile(pathB, "utf-8").catch(() => null),
+    readFileOrNull(pathA),
+    readFileOrNull(pathB),
   ]);
   return diffText(rawA, rawB);
 };
@@ -34,8 +37,8 @@ export const diffJsonFiles = async (
   pathB: string
 ): Promise<DiffResult> => {
   const [rawA, rawB] = await Promise.all([
-    readFile(pathA, "utf-8").catch(() => null),
-    readFile(pathB, "utf-8").catch(() => null),
+    readFileOrNull(pathA),
+    readFileOrNull(pathB),
   ]);
 
   if (rawA === null && rawB === null) {
