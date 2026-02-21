@@ -27,11 +27,12 @@ export const messages = {
   copy_backed_up: "Backed up to",
   copy_done: "Copied",
   copy_skipped: "Skipped.",
-  copy_dir_not_supported:
-    "Directory diff not yet supported — showing file list instead.",
+  copy_dir_listing: "Source contents:",
 
   // ── Diff ─────────────────────────────────────────────────
   diff_summary_label: "Summary:",
+  diff_dir_src_only: "(source only)",
+  diff_dir_dst_only: "(destination only)",
 
   // ── Migration Prompt header ───────────────────────────────
   prompt_header: "Migration Prompt (copy & paste into Claude)",

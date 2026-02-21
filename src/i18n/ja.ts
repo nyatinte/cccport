@@ -29,11 +29,12 @@ export const messages: Record<keyof typeof enMessages, string> = {
   copy_backed_up: "バックアップ先:",
   copy_done: "コピー完了",
   copy_skipped: "スキップしました。",
-  copy_dir_not_supported:
-    "ディレクトリ diff は未対応です — ファイル一覧を表示します。",
+  copy_dir_listing: "コピー元の内容:",
 
   // ── 差分 ──────────────────────────────────────────────────
   diff_summary_label: "サマリー:",
+  diff_dir_src_only: "(コピー元のみ)",
+  diff_dir_dst_only: "(コピー先のみ)",
 
   // ── 移行プロンプト ヘッダー ───────────────────────────────
   prompt_header: "移行プロンプト（Claude にコピー＆ペーストしてください）",
