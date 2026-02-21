@@ -1,6 +1,6 @@
 # cccport
 
-[English](./README.md)
+[English](./README.md) | **日本語**
 
 Claude Code プロジェクト設定（`.claude/`）をグローバル（`~/.claude/`）とプロジェクトローカルのルート間で移行するインタラクティブ TUI。
 
