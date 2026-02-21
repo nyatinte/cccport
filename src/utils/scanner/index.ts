@@ -27,15 +27,13 @@ export const scanWithRoots = async (
   };
 };
 
-/**
- * Scan ~/.claude (global) and <projectCwd>/.claude (project).
- * Global root: CLAUDE_CONFIG_DIR env var → ~/.claude
- */
-export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> => {
-  const globalRoot =
-    process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR);
-  return scanWithRoots(globalRoot, join(projectCwd, CLAUDE_DIR));
-};
+/** Resolve the global config root: CLAUDE_CONFIG_DIR env var → ~/.claude */
+export const resolveGlobalRoot = (): string =>
+  process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR);
+
+/** Scan global and project .claude dirs. */
+export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> =>
+  scanWithRoots(resolveGlobalRoot(), join(projectCwd, CLAUDE_DIR));
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
@@ -175,32 +173,21 @@ if (import.meta.vitest) {
     });
   });
 
-  describe("scanClaudeDirs", () => {
+  describe("resolveGlobalRoot", () => {
     afterEach(() => {
       vi.unstubAllEnvs();
     });
 
-    it("uses os.homedir()/.claude when CLAUDE_CONFIG_DIR is unset", async () => {
-      // given
-      await using p = await createFixture({});
-      // when
-      const result = await scanClaudeDirs(p.path);
-      // then
-      expect(result.globalRoot).toContain(".claude");
+    it("returns homedir/.claude when CLAUDE_CONFIG_DIR is unset", () => {
+      // when / then
+      expect(resolveGlobalRoot()).toBe(join(homedir(), ".claude"));
     });
 
-    it("uses CLAUDE_CONFIG_DIR env var when set", async () => {
+    it("returns CLAUDE_CONFIG_DIR when set", () => {
       // given
-      await using g = await createFixture({ "settings.json": "{}" });
-      vi.stubEnv("CLAUDE_CONFIG_DIR", g.path);
-      await using p = await createFixture({});
-      // when
-      const result = await scanClaudeDirs(p.path);
-      // then
-      expect(result.globalRoot).toBe(g.path);
-      expect(result.files.some((f) => f.relativePath === "settings.json")).toBe(
-        true
-      );
+      vi.stubEnv("CLAUDE_CONFIG_DIR", "/custom/config");
+      // when / then
+      expect(resolveGlobalRoot()).toBe("/custom/config");
     });
   });
 }
