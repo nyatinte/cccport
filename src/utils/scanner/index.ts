@@ -33,9 +33,7 @@ export const scanWithRoots = async (
  */
 export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> => {
   const globalRoot =
-    process.env.CLAUDE_CONFIG_DIR !== undefined
-      ? process.env.CLAUDE_CONFIG_DIR
-      : join(homedir(), CLAUDE_DIR);
+    process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR);
   return scanWithRoots(globalRoot, join(projectCwd, CLAUDE_DIR));
 };
 
