@@ -68,7 +68,7 @@ Tests live in the same file as the code they test (Vitest in-source tests):
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
 
-  describe("myFn", () => {
+  describe(myFn, () => {
     it("does something", () => {
       // given
       const input = "foo";
@@ -78,6 +78,8 @@ if (import.meta.vitest) {
   });
 }
 ```
+
+Use a function (or class) reference as the first argument to `describe` — Vitest uses `.name` to label the suite. When a suite covers multiple functions, fall back to a string (e.g. `describe("initI18n + t()", ...)`). This applies to both in-source tests and standalone bench files.
 
 Markers: `// given`, `// when`, `// then`, `// when / then` — short, no description after.
 
