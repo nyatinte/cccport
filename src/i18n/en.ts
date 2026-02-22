@@ -69,6 +69,7 @@ export const messages = {
   no_files_found: "No Claude config files found in either location.",
   goodbye: "Done! 👋",
   skipped: "Skipped.",
+  legend_status: "✓ = exists  ✗ = not found",
 } as const;
 
 export type MessageKey = keyof typeof messages;

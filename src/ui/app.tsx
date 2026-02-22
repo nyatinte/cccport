@@ -15,6 +15,38 @@ export interface AppSelection {
 
 const NAME_WIDTH = 24;
 
+const basename = (rel: string): string => {
+  const slash = rel.lastIndexOf("/");
+  return slash === -1 ? rel : rel.slice(slash + 1);
+};
+
+interface FileGroup {
+  entries: { file: ClaudeFile; idx: number }[];
+  groupName: string | null;
+}
+
+const groupFiles = (files: ClaudeFile[]): FileGroup[] => {
+  const groups: FileGroup[] = [];
+  let current: FileGroup | null = null;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file) {
+      continue;
+    }
+    const slash = file.relativePath.indexOf("/");
+    const groupName = slash === -1 ? null : file.relativePath.slice(0, slash);
+
+    if (current === null || current.groupName !== groupName) {
+      current = { groupName, entries: [] };
+      groups.push(current);
+    }
+    current.entries.push({ file, idx: i });
+  }
+
+  return groups;
+};
+
 interface PanelProps {
   cursor: number;
   files: ClaudeFile[];
@@ -31,41 +63,61 @@ const Panel: React.FC<PanelProps> = ({
   cursor,
   isActive,
   side,
-}) => (
-  <Box
-    borderColor={isActive ? "cyan" : "gray"}
-    borderStyle="round"
-    flexDirection="column"
-    minWidth={NAME_WIDTH + 12}
-    paddingX={1}
-  >
-    <Text bold color={isActive ? "cyan" : "gray"}>
-      {title}
-    </Text>
-    <Text dimColor>{root}</Text>
-    <Box flexDirection="column" marginTop={1}>
-      {files.map((file, i) => {
-        const exists =
-          side === "global" ? file.existsGlobal : file.existsProject;
-        const active = i === cursor;
-        const name =
-          file.relativePath.length > NAME_WIDTH
-            ? `${file.relativePath.slice(0, NAME_WIDTH - 1)}…`
-            : file.relativePath.padEnd(NAME_WIDTH);
-        return (
-          <Box key={file.relativePath}>
-            <Text color="cyan">{active && isActive ? "▶ " : "  "}</Text>
-            <Text bold={active} dimColor={!exists} inverse={active && isActive}>
-              {file.isDirectory ? "▸ " : "  "}
-              {name}
-            </Text>
-            <Text color={exists ? "green" : "red"}>{exists ? " ✓" : " ✗"}</Text>
+}) => {
+  const groups = groupFiles(files);
+
+  return (
+    <Box
+      borderColor={isActive ? "cyan" : "gray"}
+      borderStyle="round"
+      flexDirection="column"
+      minWidth={NAME_WIDTH + 12}
+      paddingX={1}
+    >
+      <Text bold color={isActive ? "cyan" : "gray"}>
+        {title}
+      </Text>
+      <Text dimColor>{root}</Text>
+      <Box flexDirection="column" marginTop={1}>
+        {groups.map((group) => (
+          <Box flexDirection="column" key={group.groupName ?? "__top__"}>
+            {group.groupName && (
+              <Box marginTop={1}>
+                <Text dimColor>{`── ${group.groupName} ──`}</Text>
+              </Box>
+            )}
+            {group.entries.map(({ file, idx }) => {
+              const exists =
+                side === "global" ? file.existsGlobal : file.existsProject;
+              const active = idx === cursor;
+              const raw = basename(file.relativePath);
+              const name =
+                raw.length > NAME_WIDTH
+                  ? `${raw.slice(0, NAME_WIDTH - 1)}…`
+                  : raw.padEnd(NAME_WIDTH);
+              return (
+                <Box key={file.relativePath}>
+                  <Text color="cyan">{active && isActive ? "▶ " : "  "}</Text>
+                  <Text
+                    bold={active}
+                    dimColor={!exists}
+                    inverse={active && isActive}
+                  >
+                    {file.isDirectory ? "▸ " : "  "}
+                    {name}
+                  </Text>
+                  <Text color={exists ? "green" : "red"}>
+                    {exists ? " ✓" : " ✗"}
+                  </Text>
+                </Box>
+              );
+            })}
           </Box>
-        );
-      })}
+        ))}
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 // ── App ────────────────────────────────────────────────────────────────────
 
@@ -154,6 +206,7 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
         <Text dimColor>
           {"   [↑↓] move  [C] copy  [D] diff  [P] prompt  [Q] quit"}
         </Text>
+        <Text dimColor>{`   ${t("legend_status")}`}</Text>
       </Box>
     </Box>
   );

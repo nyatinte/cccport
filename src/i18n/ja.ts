@@ -71,4 +71,5 @@ export const messages: Record<keyof typeof enMessages, string> = {
     "どちらのディレクトリにも Claude 設定ファイルが見つかりません。",
   goodbye: "完了！ 👋",
   skipped: "スキップしました。",
+  legend_status: "✓ = 存在する  ✗ = 存在しない",
 };
