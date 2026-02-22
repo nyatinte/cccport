@@ -35,13 +35,23 @@ src/
       core.ts               # diffText, diffJsonObjects (pure, no I/O)
       files.ts              # diffFiles, diffJsonFiles (reads from disk)
     scanner/
-      walk.ts               # pathExists, walkClaudeDir
-      build.ts              # shouldInclude, buildFileList
+      walk.ts               # pathExists, walkClaudeDir, RECURSE_DIRS
+      build.ts              # shouldInclude, buildFileList (ALLOWED_TOP_LEVEL_FILES + RECURSE_DIRS)
       index.ts              # scanWithRoots, scanClaudeDirs (public API)
     dir-ops.ts              # copyDir, diffDir, DirFileDiff (FS-level dir operations)
     enquirer-helpers.ts     # type-safe select<T> and confirm wrappers
     prompt-generator.ts     # generateMigrationPrompt (AI prompt text)
 ```
+
+## Scanner rules
+
+Only Claude Code meaningful entries are surfaced:
+
+**Top-level files** (allowlist): `CLAUDE.md`, `CLAUDE.local.md`, `settings.json`, `settings.local.json`, `.mcp.json`, `keybindings.json`
+
+**Container directories** (immediate children shown as leaf entries): `agents/`, `skills/`, `commands/`, `hooks/`, `rules/`
+
+Entries deeper than one level (e.g. `skills/<name>/<file>`) are excluded. `skills/<name>/` surfaces as `isDirectory = true`; `agents/<name>.md` as a regular file entry.
 
 ## Coding conventions
 

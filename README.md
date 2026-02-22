@@ -53,20 +53,29 @@ src/
     en.ts / ja.ts           # message catalogs
   ui/
     types.ts                # Action, Direction
-    selectors.ts            # pickFile, pickAction, pickDirection (enquirer prompts)
-    handlers.ts             # handleCopy, handleDiff, handlePrompt
-    interactive.ts          # runInteractive (main TUI loop)
+    app.tsx                 # App, Panel — Ink two-panel TUI (React components)
+    handlers.ts             # handleCopy, handleDiff, handlePrompt, resolvePaths
+    interactive.ts          # runInteractive — Ink render loop
   utils/
     diff/
       core.ts               # diffText, diffJsonObjects (pure, no I/O)
       files.ts              # diffFiles, diffJsonFiles (reads from disk)
     scanner/
-      walk.ts               # pathExists, walkClaudeDir
-      build.ts              # shouldInclude, buildFileList
+      walk.ts               # pathExists, walkClaudeDir, RECURSE_DIRS
+      build.ts              # shouldInclude, buildFileList (ALLOWED_TOP_LEVEL_FILES + RECURSE_DIRS)
       index.ts              # scanWithRoots, scanClaudeDirs (public API)
+    dir-ops.ts              # copyDir, diffDir, DirFileDiff (FS-level dir operations)
     enquirer-helpers.ts     # type-safe select<T> and confirm wrappers
     prompt-generator.ts     # generateMigrationPrompt (AI prompt text)
 ```
+
+## Scoped entries
+
+The scanner only surfaces Claude Code meaningful entries:
+
+**Top-level files**: `CLAUDE.md`, `CLAUDE.local.md`, `settings.json`, `settings.local.json`, `.mcp.json`, `keybindings.json`
+
+**Container directories** (immediate children shown as leaf entries): `agents/`, `skills/`, `commands/`, `hooks/`, `rules/`
 
 ## i18n
 

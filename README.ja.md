@@ -53,20 +53,29 @@ src/
     en.ts / ja.ts           # メッセージカタログ
   ui/
     types.ts                # Action, Direction
-    selectors.ts            # pickFile, pickAction, pickDirection（enquirer プロンプト）
-    handlers.ts             # handleCopy, handleDiff, handlePrompt
-    interactive.ts          # runInteractive（メイン TUI ループ）
+    app.tsx                 # App, Panel — Ink 二画面 TUI（React コンポーネント）
+    handlers.ts             # handleCopy, handleDiff, handlePrompt, resolvePaths
+    interactive.ts          # runInteractive — Ink レンダーループ
   utils/
     diff/
       core.ts               # diffText, diffJsonObjects（純粋関数、I/O なし）
       files.ts              # diffFiles, diffJsonFiles（ディスクから読み込み）
     scanner/
-      walk.ts               # pathExists, walkClaudeDir
-      build.ts              # shouldInclude, buildFileList
+      walk.ts               # pathExists, walkClaudeDir, RECURSE_DIRS
+      build.ts              # shouldInclude, buildFileList（ALLOWED_TOP_LEVEL_FILES + RECURSE_DIRS）
       index.ts              # scanWithRoots, scanClaudeDirs（公開 API）
+    dir-ops.ts              # copyDir, diffDir, DirFileDiff（FS レベルのディレクトリ操作）
     enquirer-helpers.ts     # 型安全な select<T> と confirm ラッパー
     prompt-generator.ts     # generateMigrationPrompt（AI プロンプトテキスト）
 ```
+
+## スキャン対象エントリ
+
+スキャナーは Claude Code として意味のあるエントリのみを対象とします:
+
+**トップレベルファイル**: `CLAUDE.md`, `CLAUDE.local.md`, `settings.json`, `settings.local.json`, `.mcp.json`, `keybindings.json`
+
+**コンテナディレクトリ**（直下の子エントリをリーフとして表示）: `agents/`, `skills/`, `commands/`, `hooks/`, `rules/`
 
 ## i18n
 
