@@ -27,9 +27,9 @@ src/
     en.ts / ja.ts           # message catalogs
   ui/
     types.ts                # Action, Direction
-    selectors.ts            # pickFile, pickAction, pickDirection (enquirer prompts)
+    app.tsx                 # App, Panel — Ink two-panel TUI (React components)
     handlers.ts             # handleCopy, handleDiff, handlePrompt, resolvePaths
-    interactive.ts          # runInteractive (main TUI loop)
+    interactive.ts          # runInteractive — Ink render loop
   utils/
     diff/
       core.ts               # diffText, diffJsonObjects (pure, no I/O)
