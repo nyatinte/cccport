@@ -69,7 +69,9 @@ export const messages = {
   no_files_found: "No Claude config files found in either location.",
   goodbye: "Done! 👋",
   skipped: "Skipped.",
-  legend_status: "✓ = exists  ✗ = not found",
+  legend_tab: "[Tab] switch direction",
+  legend_keys: "[↑↓] move  [C] copy  [D] diff  [P] prompt  [Q] quit",
+  legend_status: "● = in sync  ○ = diverged",
 } as const;
 
 export type MessageKey = keyof typeof messages;

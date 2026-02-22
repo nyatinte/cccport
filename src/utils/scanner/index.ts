@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ScanResult } from "../../types.js";
 import { buildFileList } from "./build.js";
+import { computeSyncStatus } from "./sync.js";
 import { walkClaudeDir } from "./walk.js";
 
 const CLAUDE_DIR = ".claude";
@@ -15,16 +16,19 @@ export const scanWithRoots = async (
     walkClaudeDir(globalRoot),
     walkClaudeDir(projectRoot),
   ]);
-  return {
+  const rawFiles = buildFileList(
     globalRoot,
     projectRoot,
-    files: buildFileList(
-      globalRoot,
-      projectRoot,
-      globalEntries,
-      projectEntries
-    ),
-  };
+    globalEntries,
+    projectEntries
+  );
+  const files = await Promise.all(
+    rawFiles.map(async (f) => ({
+      ...f,
+      syncStatus: await computeSyncStatus(f),
+    }))
+  );
+  return { globalRoot, projectRoot, files };
 };
 
 /** Resolve the global config root: CLAUDE_CONFIG_DIR env var → ~/.claude */
@@ -62,6 +66,7 @@ if (import.meta.vitest) {
       expect(files[0]?.relativePath).toBe("settings.json");
       expect(files[0]?.existsGlobal).toBe(true);
       expect(files[0]?.existsProject).toBe(false);
+      expect(files[0]?.syncStatus).toBe("global-only");
     });
 
     it("detects a file that exists only in project", async () => {
@@ -75,9 +80,10 @@ if (import.meta.vitest) {
       expect(files[0]?.relativePath).toBe("CLAUDE.md");
       expect(files[0]?.existsGlobal).toBe(false);
       expect(files[0]?.existsProject).toBe(true);
+      expect(files[0]?.syncStatus).toBe("project-only");
     });
 
-    it("detects a file that exists in both", async () => {
+    it("marks synced when both files have identical content", async () => {
       // given
       await using g = await createFixture({ "settings.json": "{}" });
       await using p = await createFixture({ "settings.json": "{}" });
@@ -87,6 +93,17 @@ if (import.meta.vitest) {
       expect(files).toHaveLength(1);
       expect(files[0]?.existsGlobal).toBe(true);
       expect(files[0]?.existsProject).toBe(true);
+      expect(files[0]?.syncStatus).toBe("synced");
+    });
+
+    it("marks diverged when both files have different content", async () => {
+      // given
+      await using g = await createFixture({ "CLAUDE.md": "# global" });
+      await using p = await createFixture({ "CLAUDE.md": "# project" });
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files[0]?.syncStatus).toBe("diverged");
     });
 
     it("shows skills/<name> as a directory entry", async () => {

@@ -128,6 +128,7 @@ if (import.meta.vitest) {
         existsProject: false,
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
+        syncStatus: "global-only",
       };
       // when
       const prompt = await generateMigrationPrompt(file, {
@@ -150,6 +151,7 @@ if (import.meta.vitest) {
         existsProject: true,
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
+        syncStatus: "project-only",
       };
       // when
       const prompt = await generateMigrationPrompt(file, {
@@ -175,6 +177,7 @@ if (import.meta.vitest) {
         existsProject: true,
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
+        syncStatus: "diverged",
       };
       // when
       const prompt = await generateMigrationPrompt(file, {
@@ -198,6 +201,7 @@ if (import.meta.vitest) {
         existsProject: true,
         globalPath: join(g.path, "skills/my-debug"),
         projectPath: join(p.path, "skills/my-debug"),
+        syncStatus: "project-only",
       };
       // when
       const prompt = await generateMigrationPrompt(file, {
@@ -221,6 +225,7 @@ if (import.meta.vitest) {
         existsProject: false,
         globalPath: join(g.path, "settings.json"),
         projectPath: join(p.path, "settings.json"),
+        syncStatus: "global-only",
       };
       // when
       const prompt = await generateMigrationPrompt(file, {

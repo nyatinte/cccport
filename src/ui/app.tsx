@@ -52,7 +52,6 @@ interface PanelProps {
   files: ClaudeFile[];
   isActive: boolean;
   root: string;
-  side: "global" | "project";
   title: string;
   width: number;
 }
@@ -63,7 +62,6 @@ const Panel: React.FC<PanelProps> = ({
   files,
   cursor,
   isActive,
-  side,
   width,
 }) => {
   const groups = groupFiles(files);
@@ -91,28 +89,26 @@ const Panel: React.FC<PanelProps> = ({
               </Box>
             )}
             {group.entries.map(({ file, idx }) => {
-              const exists =
-                side === "global" ? file.existsGlobal : file.existsProject;
               const active = idx === cursor;
               const raw = basename(file.relativePath);
               const name =
                 raw.length > NAME_WIDTH
                   ? `${raw.slice(0, NAME_WIDTH - 1)}…`
                   : raw.padEnd(NAME_WIDTH);
+              const [marker, markerColor] =
+                file.syncStatus === "synced"
+                  ? ([" ●", "green"] as const)
+                  : file.syncStatus === "diverged"
+                    ? ([" ○", "yellow"] as const)
+                    : (["  ", "gray"] as const);
               return (
                 <Box key={file.relativePath}>
                   <Text color="cyan">{active && isActive ? "▶ " : "  "}</Text>
-                  <Text
-                    bold={active}
-                    dimColor={!exists}
-                    inverse={active && isActive}
-                  >
+                  <Text bold={active} inverse={active && isActive}>
                     {file.isDirectory ? "▸ " : "  "}
                     {name}
                   </Text>
-                  <Text color={exists ? "green" : "red"}>
-                    {exists ? " ✓" : " ✗"}
-                  </Text>
+                  <Text color={markerColor}>{marker}</Text>
                 </Box>
               );
             })}
@@ -134,7 +130,7 @@ interface AppProps {
 const MIN_PANEL_WIDTH = NAME_WIDTH + 12;
 
 export const App: React.FC<AppProps> = ({ scan, onAction }) => {
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState({ global: 0, project: 0 });
   const [side, setSide] = useState<"global" | "project">("global");
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -147,10 +143,12 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
     Math.floor((stdout.columns - 1) / 2)
   );
 
-  const files = scan.files;
+  const globalFiles = scan.files.filter((f) => f.existsGlobal);
+  const projectFiles = scan.files.filter((f) => f.existsProject);
 
   const trigger = (action: Exclude<Action, "skip">) => {
-    const file = files[cursor];
+    const activeFiles = side === "global" ? globalFiles : projectFiles;
+    const file = activeFiles[cursor[side]];
     if (!file) {
       return;
     }
@@ -160,10 +158,14 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
   };
 
   useInput((input, key) => {
+    const activeFiles = side === "global" ? globalFiles : projectFiles;
     if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-    } else if (key.downArrow) {
-      setCursor((c) => Math.min(files.length - 1, c + 1));
+      setCursor((c) => ({ ...c, [side]: Math.max(0, c[side] - 1) }));
+    } else if (key.downArrow && activeFiles.length > 0) {
+      setCursor((c) => ({
+        ...c,
+        [side]: Math.min(activeFiles.length - 1, c[side] + 1),
+      }));
     } else if (key.tab) {
       setSide((s) => (s === "global" ? "project" : "global"));
     } else if (input === "q" || input === "Q" || key.escape) {
@@ -179,6 +181,7 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
   });
 
   const dirLabel = side === "global" ? t("direction_g2p") : t("direction_p2g");
+  const allEmpty = globalFiles.length === 0 && projectFiles.length === 0;
 
   return (
     <Box flexDirection="column">
@@ -188,27 +191,25 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
         {"━".repeat(42)}
       </Text>
 
-      {files.length === 0 ? (
+      {allEmpty ? (
         <Box marginTop={1}>
           <Text color="yellow">{t("no_files_found")}</Text>
         </Box>
       ) : (
         <Box flexDirection="row" gap={1}>
           <Panel
-            cursor={cursor}
-            files={files}
+            cursor={cursor.global}
+            files={globalFiles}
             isActive={side === "global"}
             root={scan.globalRoot}
-            side="global"
             title={t("header_global")}
             width={panelWidth}
           />
           <Panel
-            cursor={cursor}
-            files={files}
+            cursor={cursor.project}
+            files={projectFiles}
             isActive={side === "project"}
             root={scan.projectRoot}
-            side="project"
             title={t("header_project")}
             width={panelWidth}
           />
@@ -219,11 +220,9 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
         <Box>
           <Text color="cyan">{"⟹  "}</Text>
           <Text bold>{dirLabel}</Text>
-          <Text dimColor>{"   [Tab] switch direction"}</Text>
+          <Text dimColor>{`   ${t("legend_tab")}`}</Text>
         </Box>
-        <Text dimColor>
-          {"   [↑↓] move  [C] copy  [D] diff  [P] prompt  [Q] quit"}
-        </Text>
+        <Text dimColor>{`   ${t("legend_keys")}`}</Text>
         <Text dimColor>{`   ${t("legend_status")}`}</Text>
       </Box>
     </Box>

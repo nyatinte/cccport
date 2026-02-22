@@ -2,6 +2,8 @@ import { join } from "node:path";
 import type { ClaudeFile } from "../../types.js";
 import { RECURSE_DIRS } from "./walk.js";
 
+type RawClaudeFile = Omit<ClaudeFile, "syncStatus">;
+
 const TRAILING_SLASH = /\/$/;
 
 /** Top-level files with special meaning in Claude Code */
@@ -39,7 +41,7 @@ export const buildFileList = (
   projectRoot: string,
   globalEntries: string[],
   projectEntries: string[]
-): ClaudeFile[] => {
+): RawClaudeFile[] => {
   const globalDirs = new Set(
     globalEntries.filter((e) => e.endsWith("/")).map((e) => e.slice(0, -1))
   );
@@ -52,7 +54,7 @@ export const buildFileList = (
     ...projectEntries.map((e) => e.replace(TRAILING_SLASH, "")),
   ]);
 
-  const files: ClaudeFile[] = [];
+  const files: RawClaudeFile[] = [];
   for (const rel of allKeys) {
     if (!shouldInclude(rel)) {
       continue;
