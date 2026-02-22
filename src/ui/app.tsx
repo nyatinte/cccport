@@ -1,4 +1,4 @@
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
 import { useState } from "react";
 import { t } from "../i18n/index.js";
@@ -54,6 +54,7 @@ interface PanelProps {
   root: string;
   side: "global" | "project";
   title: string;
+  width: number;
 }
 
 const Panel: React.FC<PanelProps> = ({
@@ -63,6 +64,7 @@ const Panel: React.FC<PanelProps> = ({
   cursor,
   isActive,
   side,
+  width,
 }) => {
   const groups = groupFiles(files);
 
@@ -71,13 +73,15 @@ const Panel: React.FC<PanelProps> = ({
       borderColor={isActive ? "cyan" : "gray"}
       borderStyle="round"
       flexDirection="column"
-      minWidth={NAME_WIDTH + 12}
       paddingX={1}
+      width={width}
     >
       <Text bold color={isActive ? "cyan" : "gray"}>
         {title}
       </Text>
-      <Text dimColor>{root}</Text>
+      <Text dimColor wrap="truncate">
+        {root}
+      </Text>
       <Box flexDirection="column" marginTop={1}>
         {groups.map((group) => (
           <Box flexDirection="column" key={group.groupName ?? "__top__"}>
@@ -126,10 +130,22 @@ interface AppProps {
   scan: ScanResult;
 }
 
+// Minimum usable panel width: border(2) + paddingX(2) + cursor(2) + icon(2) + name + status(2)
+const MIN_PANEL_WIDTH = NAME_WIDTH + 12;
+
 export const App: React.FC<AppProps> = ({ scan, onAction }) => {
   const [cursor, setCursor] = useState(0);
   const [side, setSide] = useState<"global" | "project">("global");
   const { exit } = useApp();
+  const { stdout } = useStdout();
+
+  // Derive panel width from live terminal columns so the layout never wraps
+  // when the user resizes the window. Ink re-renders on SIGWINCH and stdout.columns
+  // reflects the new size, preventing stale-height ghost lines.
+  const panelWidth = Math.max(
+    MIN_PANEL_WIDTH,
+    Math.floor((stdout.columns - 1) / 2)
+  );
 
   const files = scan.files;
 
@@ -185,6 +201,7 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
             root={scan.globalRoot}
             side="global"
             title={t("header_global")}
+            width={panelWidth}
           />
           <Panel
             cursor={cursor}
@@ -193,6 +210,7 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
             root={scan.projectRoot}
             side="project"
             title={t("header_project")}
+            width={panelWidth}
           />
         </Box>
       )}

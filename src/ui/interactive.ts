@@ -19,7 +19,10 @@ const pickFromUI = (scan: ScanResult): Promise<AppSelection | null> =>
           scan,
           onAction: resolve,
         }
-      )
+      ),
+      // Ink is the sole writer while the TUI is active; console output only
+      // occurs after unmount, so patching is unnecessary and can cause flicker.
+      { patchConsole: false }
     );
     waitUntilExit().catch(() => resolve(null));
   });
