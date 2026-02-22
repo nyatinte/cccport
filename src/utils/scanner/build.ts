@@ -1,21 +1,34 @@
 import { join } from "node:path";
 import type { ClaudeFile } from "../../types.js";
+import { RECURSE_DIRS } from "./walk.js";
 
 const TRAILING_SLASH = /\/$/;
+
+/** Top-level files with special meaning in Claude Code */
+const ALLOWED_TOP_LEVEL_FILES = new Set([
+  "CLAUDE.md",
+  "CLAUDE.local.md",
+  "settings.json",
+  "settings.local.json",
+  ".mcp.json",
+  "keybindings.json",
+]);
 
 /**
  * Whether a relative path should appear in the UI.
  *
- * - Top-level files/dirs: show, except bare "skills" itself
- * - skills/<name>: show as isDirectory=true
- * - skills/<name>/...: exclude (too deep)
+ * - Allowed top-level files: CLAUDE.md, settings.json, .mcp.json, etc.
+ * - Container dirs (agents, skills, commands, hooks, rules) are never shown as bare entries
+ * - <container>/<name>: shown as a leaf entry (file or directory)
+ * - Everything else: excluded
  */
 const shouldInclude = (rel: string): boolean => {
   const parts = rel.split("/");
+  const first = parts[0];
   if (parts.length === 1) {
-    return parts[0] !== "skills";
+    return first !== undefined && ALLOWED_TOP_LEVEL_FILES.has(first);
   }
-  if (parts.length === 2 && parts[0] === "skills") {
+  if (parts.length === 2 && first !== undefined && RECURSE_DIRS.has(first)) {
     return true;
   }
   return false;
@@ -56,8 +69,14 @@ export const buildFileList = (
   }
 
   return files.sort((a, b) => {
-    if (a.isDirectory !== b.isDirectory) {
-      return a.isDirectory ? 1 : -1;
+    const aSlash = a.relativePath.indexOf("/");
+    const bSlash = b.relativePath.indexOf("/");
+    // Top-level entries (no slash) come before container entries
+    if (aSlash === -1 && bSlash !== -1) {
+      return -1;
+    }
+    if (aSlash !== -1 && bSlash === -1) {
+      return 1;
     }
     return a.relativePath.localeCompare(b.relativePath);
   });
@@ -68,24 +87,41 @@ if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
 
   describe(shouldInclude, () => {
-    it("includes a top-level file", () => {
-      expect(shouldInclude("settings.json")).toBe(true);
+    it("includes allowed top-level files", () => {
       expect(shouldInclude("CLAUDE.md")).toBe(true);
+      expect(shouldInclude("CLAUDE.local.md")).toBe(true);
+      expect(shouldInclude("settings.json")).toBe(true);
+      expect(shouldInclude("settings.local.json")).toBe(true);
+      expect(shouldInclude(".mcp.json")).toBe(true);
+      expect(shouldInclude("keybindings.json")).toBe(true);
     });
 
-    it('excludes the bare "skills" top-level entry', () => {
+    it("excludes unknown top-level files", () => {
+      expect(shouldInclude("foo.txt")).toBe(false);
+      expect(shouldInclude("random.md")).toBe(false);
+    });
+
+    it("excludes bare container directory names", () => {
       expect(shouldInclude("skills")).toBe(false);
+      expect(shouldInclude("agents")).toBe(false);
+      expect(shouldInclude("commands")).toBe(false);
+      expect(shouldInclude("hooks")).toBe(false);
+      expect(shouldInclude("rules")).toBe(false);
     });
 
-    it("includes skills/<name> as a leaf directory", () => {
+    it("includes <container>/<name> as a leaf entry", () => {
       expect(shouldInclude("skills/my-debug")).toBe(true);
+      expect(shouldInclude("agents/code-reviewer.md")).toBe(true);
+      expect(shouldInclude("commands/review.md")).toBe(true);
+      expect(shouldInclude("hooks/protect-files.sh")).toBe(true);
+      expect(shouldInclude("rules/code-style.md")).toBe(true);
     });
 
-    it("excludes depth-2 paths that are not under skills/", () => {
+    it("excludes depth-2 paths under unknown top-level dirs", () => {
       expect(shouldInclude("foo/bar")).toBe(false);
     });
 
-    it("excludes skills/<name>/<file> (depth-3 path)", () => {
+    it("excludes depth-3 paths (e.g. skills/<name>/<file>)", () => {
       expect(shouldInclude("skills/my-debug/SKILL.md")).toBe(false);
     });
   });

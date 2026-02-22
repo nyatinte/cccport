@@ -114,6 +114,47 @@ if (import.meta.vitest) {
       expect(files.find((f) => f.relativePath === "skills")).toBeUndefined();
     });
 
+    it("shows agents/<name>.md as a file entry", async () => {
+      // given
+      await using g = await createFixture({
+        "agents/code-reviewer.md": "# agent",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      const agent = files.find(
+        (f) => f.relativePath === "agents/code-reviewer.md"
+      );
+      expect(agent).toBeDefined();
+      expect(agent?.isDirectory).toBe(false);
+    });
+
+    it('"agents" parent dir itself should NOT appear', async () => {
+      // given
+      await using g = await createFixture({
+        "agents/code-reviewer.md": "# agent",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files.find((f) => f.relativePath === "agents")).toBeUndefined();
+    });
+
+    it("excludes unknown top-level files", async () => {
+      // given
+      await using g = await createFixture({
+        "unknown.txt": "content",
+        "random.md": "content",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(0);
+    });
+
     it("individual files inside skills/<name>/ are excluded", async () => {
       // given
       await using g = await createFixture({
@@ -150,16 +191,18 @@ if (import.meta.vitest) {
     it("multiple files of the same type are sorted alphabetically", async () => {
       // given
       await using g = await createFixture({
-        "z-last.md": "z",
-        "a-first.md": "a",
+        "settings.json": "{}",
+        "CLAUDE.md": "# hello",
       });
       await using p = await createFixture({});
       // when
       const { files } = await scanWithRoots(g.path, p.path);
       // then
-      const aIdx = files.findIndex((f) => f.relativePath === "a-first.md");
-      const zIdx = files.findIndex((f) => f.relativePath === "z-last.md");
-      expect(aIdx).toBeLessThan(zIdx);
+      const claudeIdx = files.findIndex((f) => f.relativePath === "CLAUDE.md");
+      const settingsIdx = files.findIndex(
+        (f) => f.relativePath === "settings.json"
+      );
+      expect(claudeIdx).toBeLessThan(settingsIdx);
     });
 
     it("returns empty when neither directory exists on disk", async () => {

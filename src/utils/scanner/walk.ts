@@ -6,6 +6,15 @@ export const pathExists = (p: string): Promise<boolean> =>
     .then(() => true)
     .catch(() => false);
 
+/** Top-level directories whose immediate children should be listed */
+export const RECURSE_DIRS = new Set([
+  "agents",
+  "skills",
+  "commands",
+  "hooks",
+  "rules",
+]);
+
 export const walkClaudeDir = async (root: string): Promise<string[]> => {
   if (!(await pathExists(root))) {
     return [];
@@ -20,8 +29,9 @@ export const walkClaudeDir = async (root: string): Promise<string[]> => {
       const rel = relative(root, abs);
       if (entry.isDirectory()) {
         results.push(`${rel}/`);
-        // Only recurse one level into skills/ — individual skill dirs are the leaf nodes
-        if (rel === "skills") {
+        // Recurse one level into known Claude Code container directories
+        const parts = rel.split("/");
+        if (parts.length === 1 && RECURSE_DIRS.has(rel)) {
           await walk(abs);
         }
       } else {
