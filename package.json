@@ -25,6 +25,7 @@
     "enquirer": "^2.4.1",
     "i18next": "^25.8.11",
     "ink": "^6.8.0",
+    "os-locale": "^8.0.0",
     "react": "^19.2.4"
   },
   "devDependencies": {

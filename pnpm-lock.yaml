@@ -20,6 +20,9 @@ importers:
       ink:
         specifier: ^6.8.0
         version: 6.8.0(@types/react@19.2.14)(react@19.2.4)
+      os-locale:
+        specifier: ^8.0.0
+        version: 8.0.0
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -758,6 +761,10 @@ packages:
   onetime@5.1.2:
     resolution: {integrity: sha512-kbpaSSGJTWdAY5KPVeMOKXSrPtr8C8C7wodJbcsd51jRnmD+GZu8Y0VoU6Dm5Z4vWr0Ig/1NKuWRKf7j5aaYSg==}
     engines: {node: '>=6'}
+
+  os-locale@8.0.0:
+    resolution: {integrity: sha512-0hdyXRn0wSKMTHCo2CkPJdTKzIhg1Wb7DxJtkeD8M8rRXSwP2ZFRu4UiWBnkjPdRbL5X+AnUVXBE2SZOmkm3dg==}
+    engines: {node: '>=20'}
 
   patch-console@2.0.0:
     resolution: {integrity: sha512-0YNdUceMdaQwoKce1gatDScmMo5pu/tfABfnzEqeG0gtTmd7mh/WcwgUjtAeOU7N8nFFlbQBnFK2gXW5fGvmMA==}
@@ -1559,6 +1566,8 @@ snapshots:
   onetime@5.1.2:
     dependencies:
       mimic-fn: 2.1.0
+
+  os-locale@8.0.0: {}
 
   patch-console@2.0.0: {}
 

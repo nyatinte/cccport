@@ -1,16 +1,11 @@
-import { execSync } from "node:child_process";
+import osLocale from "os-locale";
 import type { InitOptions, LanguageDetectorModule, Services } from "i18next";
 
-type AppleLocaleReader = () => string | undefined;
-type PlatformGetter = () => string;
+type OsLocaleReader = () => string | undefined;
 
-const defaultAppleLocaleReader: AppleLocaleReader = () => {
+const defaultOsLocaleReader: OsLocaleReader = () => {
   try {
-    return execSync("defaults read -g AppleLocale", {
-      encoding: "utf8",
-      timeout: 2000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    return osLocale();
   } catch {
     return undefined;
   }
@@ -22,15 +17,10 @@ export class CliLanguageDetector implements LanguageDetectorModule {
 
   #services!: Services;
   #i18nextOptions!: InitOptions;
-  readonly #readAppleLocale: AppleLocaleReader;
-  readonly #getPlatform: PlatformGetter;
+  readonly #readOsLocale: OsLocaleReader;
 
-  constructor(
-    readAppleLocale: AppleLocaleReader = defaultAppleLocaleReader,
-    getPlatform: PlatformGetter = () => process.platform
-  ) {
-    this.#readAppleLocale = readAppleLocale;
-    this.#getPlatform = getPlatform;
+  constructor(readOsLocale: OsLocaleReader = defaultOsLocaleReader) {
+    this.#readOsLocale = readOsLocale;
   }
 
   init(
@@ -43,35 +33,11 @@ export class CliLanguageDetector implements LanguageDetectorModule {
   }
 
   detect(): string | readonly string[] | undefined {
-    // LC_ALL is the strongest override — honour it directly.
-    const lcAll = process.env.LC_ALL;
-    if (lcAll) {
-      const resolved = this.#resolveLocale(lcAll);
-      if (resolved != null) {
-        return resolved;
-      }
-    }
-
-    // macOS: prefer the system locale (AppleLocale) over shell defaults.
-    // Many terminal emulators inject LANG=en_US.UTF-8 even when the system
-    // language is set to a different locale (e.g. Japanese), so we read
-    // the real setting from the macOS defaults database.
-    if (this.#getPlatform() === "darwin") {
-      const appleLocale = this.#readAppleLocale();
-      if (appleLocale) {
-        const resolved = this.#resolveLocale(appleLocale);
-        if (resolved != null) {
-          return resolved;
-        }
-      }
-    }
-
-    // Remaining shell locale vars (LC_MESSAGES > LANG > LANGUAGE).
-    // LANGUAGE supports colon-separated priority lists (POSIX).
-    const shellLocale =
-      process.env.LC_MESSAGES ?? process.env.LANG ?? process.env.LANGUAGE;
-    if (shellLocale) {
-      const resolved = this.#resolveLocale(shellLocale);
+    // os-locale が LC_ALL・LC_MESSAGES・LANG・LANGUAGE 環境変数および
+    // macOS の AppleLocale (defaults read -g AppleLocale) を統合的に解決する。
+    const locale = this.#readOsLocale();
+    if (locale) {
+      const resolved = this.#resolveLocale(locale);
       if (resolved != null) {
         return resolved;
       }
@@ -89,34 +55,26 @@ export class CliLanguageDetector implements LanguageDetectorModule {
   }
 
   cacheUserLanguage(): void {
-    // no-op: locale is determined at startup from env vars
+    // no-op: locale is determined at startup from the system
   }
 
-  // Normalise a raw locale string (or colon-separated list) to a supported
-  // language code using i18next's own languageUtils.
-  // e.g. "ja_JP.UTF-8" → "ja", "en_US:fr_FR" → ["en"] (if only en supported)
-  #resolveLocale(raw: string): string | readonly string[] | undefined {
-    const codes = raw
-      .split(":")
-      .map((s) => s.split(".")[0].split("_")[0])
-      .filter(
-        (code) => code && this.#services.languageUtils.isSupportedCode(code)
-      )
-      .map((code) => this.#services.languageUtils.formatLanguageCode(code));
+  // ロケール文字列を、サポート対象の言語コードに正規化する。
+  // POSIX 形式 ("ja_JP.UTF-8") と BCP 47 形式 ("ja-JP") の両方に対応する。
+  #resolveLocale(raw: string): string | undefined {
+    // エンコーディングサフィックス (.UTF-8 など) を除去し、言語サブタグを抽出する。
+    const langCode = raw.split(".")[0].split(/[_-]/)[0];
+    if (!langCode) return undefined;
 
-    if (codes.length === 0) {
+    if (!this.#services.languageUtils.isSupportedCode(langCode)) {
       return undefined;
     }
-    if (codes.length === 1) {
-      return codes[0];
-    }
-    return codes;
+    return this.#services.languageUtils.formatLanguageCode(langCode);
   }
 }
 
 // ─── in-source tests ──────────────────────────────────────────────────────────
 if (import.meta.vitest) {
-  const { describe, it, expect, afterEach, vi } = import.meta.vitest;
+  const { describe, it, expect } = import.meta.vitest;
   const { default: i18next } = await import("i18next");
 
   const resources = {
@@ -125,23 +83,11 @@ if (import.meta.vitest) {
   };
 
   const detect = async (
-    env: Partial<
-      Record<"LC_ALL" | "LC_MESSAGES" | "LANG" | "LANGUAGE", string | undefined>
-    >,
-    opts: { platform?: string; appleLocale?: string } = {}
+    osLocaleResult: string | undefined
   ): Promise<string> => {
-    vi.stubEnv("LC_ALL", env.LC_ALL);
-    vi.stubEnv("LC_MESSAGES", env.LC_MESSAGES);
-    vi.stubEnv("LANG", env.LANG);
-    vi.stubEnv("LANGUAGE", env.LANGUAGE);
     const inst = i18next.createInstance();
     await inst
-      .use(
-        new CliLanguageDetector(
-          () => opts.appleLocale,
-          () => opts.platform ?? "linux"
-        )
-      )
+      .use(new CliLanguageDetector(() => osLocaleResult))
       .init({
         fallbackLng: "en",
         supportedLngs: ["en", "ja"],
@@ -152,81 +98,39 @@ if (import.meta.vitest) {
   };
 
   describe(CliLanguageDetector, () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
+    it("defaults to en when os-locale returns undefined", async () => {
+      // when / then
+      expect(await detect(undefined)).toBe("en");
     });
 
-    it("defaults to en when no locale env vars are set", async () => {
+    it("returns ja for BCP 47 locale 'ja-JP'", async () => {
       // when / then
-      expect(await detect({})).toBe("en");
+      expect(await detect("ja-JP")).toBe("ja");
     });
 
-    it("returns ja when LANG=ja_JP.UTF-8", async () => {
+    it("returns en for BCP 47 locale 'en-US'", async () => {
       // when / then
-      expect(await detect({ LANG: "ja_JP.UTF-8" })).toBe("ja");
+      expect(await detect("en-US")).toBe("en");
     });
 
-    it("returns en when LANG=en_US.UTF-8", async () => {
+    it("falls back to en when locale is an unsupported language", async () => {
       // when / then
-      expect(await detect({ LANG: "en_US.UTF-8" })).toBe("en");
+      expect(await detect("fr-FR")).toBe("en");
     });
 
-    it("defaults to en when locale is an unknown language code", async () => {
+    it("handles POSIX format locale 'ja_JP.UTF-8'", async () => {
       // when / then
-      expect(await detect({ LANG: "fr_FR.UTF-8" })).toBe("en");
+      expect(await detect("ja_JP.UTF-8")).toBe("ja");
     });
 
-    it("LC_ALL takes priority over LANG", async () => {
+    it("handles POSIX format locale 'en_US.UTF-8'", async () => {
       // when / then
-      expect(await detect({ LC_ALL: "ja_JP.UTF-8", LANG: "en_US.UTF-8" })).toBe(
-        "ja"
-      );
+      expect(await detect("en_US.UTF-8")).toBe("en");
     });
 
-    it("falls back to LC_MESSAGES when LC_ALL unset", async () => {
+    it("falls back to en when os-locale returns an empty string", async () => {
       // when / then
-      expect(await detect({ LC_MESSAGES: "ja_JP.UTF-8" })).toBe("ja");
-    });
-
-    it("macOS: AppleLocale=ja_JP overrides LANG=en_US.UTF-8", async () => {
-      // given: terminal injected en_US but system locale is Japanese
-      // when / then
-      expect(
-        await detect(
-          { LANG: "en_US.UTF-8" },
-          { platform: "darwin", appleLocale: "ja_JP" }
-        )
-      ).toBe("ja");
-    });
-
-    it("macOS: LC_ALL takes priority over AppleLocale", async () => {
-      // given: explicit LC_ALL=en should win even on macOS with ja_JP system locale
-      // when / then
-      expect(
-        await detect(
-          { LC_ALL: "en_US.UTF-8" },
-          { platform: "darwin", appleLocale: "ja_JP" }
-        )
-      ).toBe("en");
-    });
-
-    it("macOS: unsupported AppleLocale falls back to shell vars", async () => {
-      // given: AppleLocale is French (unsupported), LANG=ja_JP
-      // when / then
-      expect(
-        await detect(
-          { LANG: "ja_JP.UTF-8" },
-          { platform: "darwin", appleLocale: "fr_FR" }
-        )
-      ).toBe("ja");
-    });
-
-    it("non-macOS: does not use AppleLocale", async () => {
-      // given: linux with no shell vars but appleLocale injected (should be ignored)
-      // when / then
-      expect(
-        await detect({}, { platform: "linux", appleLocale: "ja_JP" })
-      ).toBe("en");
+      expect(await detect("")).toBe("en");
     });
   });
 }
