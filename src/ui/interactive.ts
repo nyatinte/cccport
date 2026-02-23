@@ -35,6 +35,9 @@ export const runInteractive = async (scan: ScanResult): Promise<void> => {
     }
 
     console.log("");
+    // Ink unmounts and calls stdin.unref(); re-ref so the event loop stays alive
+    // while enquirer prompts are active.
+    process.stdin.ref();
     if (sel.action === "copy") {
       await handleCopy(sel.file, sel.direction);
     } else if (sel.action === "diff") {
