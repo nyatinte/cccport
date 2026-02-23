@@ -1,8 +1,4 @@
-export type SyncStatus =
-  | "synced"
-  | "diverged"
-  | "global-only"
-  | "project-only";
+export type SyncStatus = "synced" | "diverged" | "global-only" | "project-only";
 
 export interface ClaudeFile {
   /** Whether the file/dir exists in the global root */

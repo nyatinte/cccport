@@ -1,7 +1,9 @@
-import osLocale from "os-locale";
 import type { InitOptions, LanguageDetectorModule, Services } from "i18next";
+import osLocale from "os-locale";
 
 type OsLocaleReader = () => string | undefined;
+
+const LANG_SUBTAG_SEPARATOR = /[_-]/;
 
 const defaultOsLocaleReader: OsLocaleReader = () => {
   try {
@@ -62,8 +64,10 @@ export class CliLanguageDetector implements LanguageDetectorModule {
   // POSIX 形式 ("ja_JP.UTF-8") と BCP 47 形式 ("ja-JP") の両方に対応する。
   #resolveLocale(raw: string): string | undefined {
     // エンコーディングサフィックス (.UTF-8 など) を除去し、言語サブタグを抽出する。
-    const langCode = raw.split(".")[0].split(/[_-]/)[0];
-    if (!langCode) return undefined;
+    const langCode = raw.split(".")[0].split(LANG_SUBTAG_SEPARATOR)[0];
+    if (!langCode) {
+      return undefined;
+    }
 
     if (!this.#services.languageUtils.isSupportedCode(langCode)) {
       return undefined;
@@ -86,14 +90,12 @@ if (import.meta.vitest) {
     osLocaleResult: string | undefined
   ): Promise<string> => {
     const inst = i18next.createInstance();
-    await inst
-      .use(new CliLanguageDetector(() => osLocaleResult))
-      .init({
-        fallbackLng: "en",
-        supportedLngs: ["en", "ja"],
-        resources,
-        showSupportNotice: false,
-      });
+    await inst.use(new CliLanguageDetector(() => osLocaleResult)).init({
+      fallbackLng: "en",
+      supportedLngs: ["en", "ja"],
+      resources,
+      showSupportNotice: false,
+    });
     return inst.language;
   };
 

@@ -16,9 +16,15 @@ export const computeSyncStatus = async ({
   isDirectory,
   projectPath,
 }: SyncInput): Promise<SyncStatus> => {
-  if (!existsGlobal) return "project-only";
-  if (!existsProject) return "global-only";
-  if (isDirectory) return "diverged";
+  if (!existsGlobal) {
+    return "project-only";
+  }
+  if (!existsProject) {
+    return "global-only";
+  }
+  if (isDirectory) {
+    return "diverged";
+  }
 
   const [contentA, contentB] = await Promise.all([
     readFile(globalPath, "utf8"),

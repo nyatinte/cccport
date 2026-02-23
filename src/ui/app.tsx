@@ -2,7 +2,7 @@ import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
 import { useState } from "react";
 import { t } from "../i18n/index.js";
-import type { ClaudeFile, ScanResult } from "../types.js";
+import type { ClaudeFile, ScanResult, SyncStatus } from "../types.js";
 import type { Action, Direction } from "./types.js";
 
 export interface AppSelection {
@@ -14,6 +14,18 @@ export interface AppSelection {
 // ── Panel ──────────────────────────────────────────────────────────────────
 
 const NAME_WIDTH = 24;
+
+const syncMarker = (
+  status: SyncStatus
+): readonly [string, "green" | "yellow" | "gray"] => {
+  if (status === "synced") {
+    return [" ●", "green"] as const;
+  }
+  if (status === "diverged") {
+    return [" ○", "yellow"] as const;
+  }
+  return ["  ", "gray"] as const;
+};
 
 const basename = (rel: string): string => {
   const slash = rel.lastIndexOf("/");
@@ -95,12 +107,7 @@ const Panel: React.FC<PanelProps> = ({
                 raw.length > NAME_WIDTH
                   ? `${raw.slice(0, NAME_WIDTH - 1)}…`
                   : raw.padEnd(NAME_WIDTH);
-              const [marker, markerColor] =
-                file.syncStatus === "synced"
-                  ? ([" ●", "green"] as const)
-                  : file.syncStatus === "diverged"
-                    ? ([" ○", "yellow"] as const)
-                    : (["  ", "gray"] as const);
+              const [marker, markerColor] = syncMarker(file.syncStatus);
               return (
                 <Box key={file.relativePath}>
                   <Text color="cyan">{active && isActive ? "▶ " : "  "}</Text>
@@ -168,14 +175,14 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
       }));
     } else if (key.tab) {
       setSide((s) => (s === "global" ? "project" : "global"));
-    } else if (input === "q" || input === "Q" || key.escape) {
+    } else if (key.escape || ["q", "Q"].includes(input)) {
       onAction(null);
       exit();
-    } else if (input === "c" || input === "C") {
+    } else if (["c", "C"].includes(input)) {
       trigger("copy");
-    } else if (input === "d" || input === "D") {
+    } else if (["d", "D"].includes(input)) {
       trigger("diff");
-    } else if (input === "p" || input === "P") {
+    } else if (["p", "P"].includes(input)) {
       trigger("prompt");
     }
   });
