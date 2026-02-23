@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { SyncStatus } from "../../types.js";
+import { dirSyncStatus } from "../dir-ops.js";
 
 interface SyncInput {
   existsGlobal: boolean;
@@ -23,7 +24,7 @@ export const computeSyncStatus = async ({
     return "global-only";
   }
   if (isDirectory) {
-    return "diverged";
+    return dirSyncStatus(globalPath, projectPath);
   }
 
   const [contentA, contentB] = await Promise.all([
@@ -104,9 +105,48 @@ if (import.meta.vitest) {
       ).toBe("diverged");
     });
 
-    it("returns diverged for directories even when both exist", async () => {
+    it("returns synced for a directory when both sides have identical content", async () => {
       // given
       await using g = await createFixture({ "skills/my-skill/SKILL.md": "x" });
+      await using p = await createFixture({ "skills/my-skill/SKILL.md": "x" });
+      // when / then
+      expect(
+        await computeSyncStatus({
+          existsGlobal: true,
+          existsProject: true,
+          globalPath: `${g.path}/skills/my-skill`,
+          projectPath: `${p.path}/skills/my-skill`,
+          isDirectory: true,
+        })
+      ).toBe("synced");
+    });
+
+    it("returns diverged for a directory when content differs", async () => {
+      // given
+      await using g = await createFixture({
+        "skills/my-skill/SKILL.md": "global version",
+      });
+      await using p = await createFixture({
+        "skills/my-skill/SKILL.md": "project version",
+      });
+      // when / then
+      expect(
+        await computeSyncStatus({
+          existsGlobal: true,
+          existsProject: true,
+          globalPath: `${g.path}/skills/my-skill`,
+          projectPath: `${p.path}/skills/my-skill`,
+          isDirectory: true,
+        })
+      ).toBe("diverged");
+    });
+
+    it("returns diverged for a directory when a file exists only on one side", async () => {
+      // given
+      await using g = await createFixture({
+        "skills/my-skill/SKILL.md": "x",
+        "skills/my-skill/extra.sh": "echo hi",
+      });
       await using p = await createFixture({ "skills/my-skill/SKILL.md": "x" });
       // when / then
       expect(
