@@ -1,0 +1,42 @@
+{
+  "name": "cccport",
+  "version": "0.1.0",
+  "description": "Interactive TUI for migrating Claude Code project settings",
+  "type": "module",
+  "bin": {
+    "cccport": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "bench": "vitest bench --run",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "enquirer": "^2.4.1",
+    "i18next": "^25.8.11",
+    "ink": "^6.8.0",
+    "os-locale": "^8.0.0",
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@vitest/coverage-v8": "^4.0.18",
+    "fs-fixture": "^2.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "ultracite": "7.2.3",
+    "vitest": "^4.0.0"
+  }
+}

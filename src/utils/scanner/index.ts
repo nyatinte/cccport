@@ -1,0 +1,253 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { ScanResult } from "../../types.js";
+import { buildFileList } from "./build.js";
+import { computeSyncStatus } from "./sync.js";
+import { walkClaudeDir } from "./walk.js";
+
+const CLAUDE_DIR = ".claude";
+
+/** Test helper: inject roots instead of relying on homedir. */
+export const scanWithRoots = async (
+  globalRoot: string,
+  projectRoot: string
+): Promise<ScanResult> => {
+  const [globalEntries, projectEntries] = await Promise.all([
+    walkClaudeDir(globalRoot),
+    walkClaudeDir(projectRoot),
+  ]);
+  const rawFiles = buildFileList(
+    globalRoot,
+    projectRoot,
+    globalEntries,
+    projectEntries
+  );
+  const files = await Promise.all(
+    rawFiles.map(async (f) => ({
+      ...f,
+      syncStatus: await computeSyncStatus(f),
+    }))
+  );
+  return { globalRoot, projectRoot, files };
+};
+
+/** Resolve the global config root: CLAUDE_CONFIG_DIR env var → ~/.claude */
+export const resolveGlobalRoot = (): string =>
+  process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), CLAUDE_DIR);
+
+/** Scan global and project .claude dirs. */
+export const scanClaudeDirs = (projectCwd: string): Promise<ScanResult> =>
+  scanWithRoots(resolveGlobalRoot(), join(projectCwd, CLAUDE_DIR));
+
+// ─── in-source tests ──────────────────────────────────────────────────────────
+if (import.meta.vitest) {
+  const { describe, it, expect, vi, afterEach } = import.meta.vitest;
+  const { createFixture } = await import("fs-fixture");
+
+  describe(scanWithRoots, () => {
+    it("returns empty files when both dirs are empty", async () => {
+      // given
+      await using g = await createFixture({});
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(0);
+    });
+
+    it("detects a file that exists only in global", async () => {
+      // given
+      await using g = await createFixture({ "settings.json": "{}" });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(1);
+      expect(files[0]?.relativePath).toBe("settings.json");
+      expect(files[0]?.existsGlobal).toBe(true);
+      expect(files[0]?.existsProject).toBe(false);
+      expect(files[0]?.syncStatus).toBe("global-only");
+    });
+
+    it("detects a file that exists only in project", async () => {
+      // given
+      await using g = await createFixture({});
+      await using p = await createFixture({ "CLAUDE.md": "# hello" });
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(1);
+      expect(files[0]?.relativePath).toBe("CLAUDE.md");
+      expect(files[0]?.existsGlobal).toBe(false);
+      expect(files[0]?.existsProject).toBe(true);
+      expect(files[0]?.syncStatus).toBe("project-only");
+    });
+
+    it("marks synced when both files have identical content", async () => {
+      // given
+      await using g = await createFixture({ "settings.json": "{}" });
+      await using p = await createFixture({ "settings.json": "{}" });
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(1);
+      expect(files[0]?.existsGlobal).toBe(true);
+      expect(files[0]?.existsProject).toBe(true);
+      expect(files[0]?.syncStatus).toBe("synced");
+    });
+
+    it("marks diverged when both files have different content", async () => {
+      // given
+      await using g = await createFixture({ "CLAUDE.md": "# global" });
+      await using p = await createFixture({ "CLAUDE.md": "# project" });
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files[0]?.syncStatus).toBe("diverged");
+    });
+
+    it("shows skills/<name> as a directory entry", async () => {
+      // given
+      await using g = await createFixture({
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      const skill = files.find((f) => f.relativePath === "skills/my-debug");
+      expect(skill).toBeDefined();
+      expect(skill?.isDirectory).toBe(true);
+    });
+
+    it('"skills" parent dir itself should NOT appear', async () => {
+      // given
+      await using g = await createFixture({});
+      await g.mkdir("skills");
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files.find((f) => f.relativePath === "skills")).toBeUndefined();
+    });
+
+    it("shows agents/<name>.md as a file entry", async () => {
+      // given
+      await using g = await createFixture({
+        "agents/code-reviewer.md": "# agent",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      const agent = files.find(
+        (f) => f.relativePath === "agents/code-reviewer.md"
+      );
+      expect(agent).toBeDefined();
+      expect(agent?.isDirectory).toBe(false);
+    });
+
+    it('"agents" parent dir itself should NOT appear', async () => {
+      // given
+      await using g = await createFixture({
+        "agents/code-reviewer.md": "# agent",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files.find((f) => f.relativePath === "agents")).toBeUndefined();
+    });
+
+    it("excludes unknown top-level files", async () => {
+      // given
+      await using g = await createFixture({
+        "unknown.txt": "content",
+        "random.md": "content",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(files).toHaveLength(0);
+    });
+
+    it("individual files inside skills/<name>/ are excluded", async () => {
+      // given
+      await using g = await createFixture({
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      expect(
+        files.find((f) => f.relativePath === "skills/my-debug/SKILL.md")
+      ).toBeUndefined();
+    });
+
+    it("files come before directories in sorted output", async () => {
+      // given
+      await using g = await createFixture({
+        "settings.json": "{}",
+        "skills/my-debug/SKILL.md": "# skill",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      const fileIdx = files.findIndex(
+        (f) => f.relativePath === "settings.json"
+      );
+      const dirIdx = files.findIndex(
+        (f) => f.relativePath === "skills/my-debug"
+      );
+      expect(fileIdx).toBeLessThan(dirIdx);
+    });
+
+    it("multiple files of the same type are sorted alphabetically", async () => {
+      // given
+      await using g = await createFixture({
+        "settings.json": "{}",
+        "CLAUDE.md": "# hello",
+      });
+      await using p = await createFixture({});
+      // when
+      const { files } = await scanWithRoots(g.path, p.path);
+      // then
+      const claudeIdx = files.findIndex((f) => f.relativePath === "CLAUDE.md");
+      const settingsIdx = files.findIndex(
+        (f) => f.relativePath === "settings.json"
+      );
+      expect(claudeIdx).toBeLessThan(settingsIdx);
+    });
+
+    it("returns empty when neither directory exists on disk", async () => {
+      // when
+      const { files } = await scanWithRoots(
+        "/tmp/cccport-nonexistent-global",
+        "/tmp/cccport-nonexistent-project"
+      );
+      // then
+      expect(files).toHaveLength(0);
+    });
+  });
+
+  describe(resolveGlobalRoot, () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("returns homedir/.claude when CLAUDE_CONFIG_DIR is unset", () => {
+      // when / then
+      expect(resolveGlobalRoot()).toBe(join(homedir(), ".claude"));
+    });
+
+    it("returns CLAUDE_CONFIG_DIR when set", () => {
+      // given
+      vi.stubEnv("CLAUDE_CONFIG_DIR", "/custom/config");
+      // when / then
+      expect(resolveGlobalRoot()).toBe("/custom/config");
+    });
+  });
+}

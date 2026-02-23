@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+import { initI18n } from "./i18n/index.js";
+import { runInteractive } from "./ui/interactive.js";
+import { scanClaudeDirs } from "./utils/scanner/index.js";
+
+const args = process.argv.slice(2);
+
+const getFlag = (flags: string[]): string | undefined => {
+  for (const flag of flags) {
+    const idx = args.indexOf(flag);
+    if (idx !== -1 && idx + 1 < args.length) {
+      return args[idx + 1];
+    }
+  }
+  return undefined;
+};
+
+const hasFlag = (flags: string[]): boolean =>
+  flags.some((f) => args.includes(f));
+
+if (hasFlag(["-h", "--help"])) {
+  console.log(
+    `
+Usage: cccport [options]
+
+Options:
+  -p, --project <path>   Project directory (default: current directory)
+  -l, --lang <locale>    Language: en | ja (default: auto-detect)
+  -h, --help             Show this help
+  -v, --version          Show version
+`.trim()
+  );
+  process.exit(0);
+}
+
+if (hasFlag(["-v", "--version"])) {
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const pkg = require("../package.json") as { version: string };
+  console.log(pkg.version);
+  process.exit(0);
+}
+
+const projectCwd = getFlag(["-p", "--project"]) ?? process.cwd();
+
+const VALID_LOCALES = ["en", "ja"] as const;
+type Locale = (typeof VALID_LOCALES)[number];
+const rawLang = getFlag(["-l", "--lang"]);
+if (
+  rawLang !== undefined &&
+  !(VALID_LOCALES as readonly string[]).includes(rawLang)
+) {
+  console.error(
+    `Error: --lang must be one of: ${VALID_LOCALES.join(", ")} (got "${rawLang}")`
+  );
+  process.exit(1);
+}
+const langArg = rawLang as Locale | undefined;
+
+await initI18n(langArg);
+const scan = await scanClaudeDirs(projectCwd);
+await runInteractive(scan);
