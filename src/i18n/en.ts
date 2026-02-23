@@ -70,7 +70,7 @@ export const messages = {
   goodbye: "Done! 👋",
   skipped: "Skipped.",
   legend_tab: "[Tab] switch direction",
-  legend_keys: "[↑↓] move  [C] copy  [D] diff  [P] prompt  [Q] quit",
+  legend_keys: "[↑↓/jk] move  [C] copy  [D] diff  [P] prompt  [Q] quit",
   legend_status: "● = in sync  ○ = diverged",
 } as const;
 

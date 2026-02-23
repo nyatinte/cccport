@@ -72,6 +72,6 @@ export const messages: Record<keyof typeof enMessages, string> = {
   goodbye: "完了！ 👋",
   skipped: "スキップしました。",
   legend_tab: "[Tab] 方向を切り替え",
-  legend_keys: "[↑↓] 移動  [C] コピー  [D] 差分  [P] プロンプト  [Q] 終了",
+  legend_keys: "[↑↓/jk] 移動  [C] コピー  [D] 差分  [P] プロンプト  [Q] 終了",
   legend_status: "● = 同期済み  ○ = 内容が異なる",
 };

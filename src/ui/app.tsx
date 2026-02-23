@@ -166,9 +166,9 @@ export const App: React.FC<AppProps> = ({ scan, onAction }) => {
 
   useInput((input, key) => {
     const activeFiles = side === "global" ? globalFiles : projectFiles;
-    if (key.upArrow) {
+    if (key.upArrow || input === "k") {
       setCursor((c) => ({ ...c, [side]: Math.max(0, c[side] - 1) }));
-    } else if (key.downArrow && activeFiles.length > 0) {
+    } else if ((key.downArrow || input === "j") && activeFiles.length > 0) {
       setCursor((c) => ({
         ...c,
         [side]: Math.min(activeFiles.length - 1, c[side] + 1),
