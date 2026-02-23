@@ -3,6 +3,7 @@ import { render } from "ink";
 import { createElement } from "react";
 import { t } from "../i18n/index.js";
 import type { ScanResult } from "../types.js";
+import { scanWithRoots } from "../utils/scanner/index.js";
 import type { AppSelection } from "./app.js";
 import { App } from "./app.js";
 import { handleCopy, handleDiff, handlePrompt } from "./handlers.js";
@@ -28,8 +29,10 @@ const pickFromUI = (scan: ScanResult): Promise<AppSelection | null> =>
   });
 
 export const runInteractive = async (scan: ScanResult): Promise<void> => {
+  let currentScan = scan;
+
   while (true) {
-    const sel = await pickFromUI(scan);
+    const sel = await pickFromUI(currentScan);
     if (sel === null) {
       break;
     }
@@ -40,6 +43,10 @@ export const runInteractive = async (scan: ScanResult): Promise<void> => {
     process.stdin.ref();
     if (sel.action === "copy") {
       await handleCopy(sel.file, sel.direction);
+      currentScan = await scanWithRoots(
+        currentScan.globalRoot,
+        currentScan.projectRoot
+      );
     } else if (sel.action === "diff") {
       await handleDiff(sel.file, sel.direction);
     } else if (sel.action === "prompt") {
